@@ -99,9 +99,9 @@ function initTree() {
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const unitX = 280;
+    const unitX = 300;
     const genH = 260;
-    const treeGap = 480;
+    const coupleGap = 120;
 
     function place(id, x, y) {
       if (placed.has(id)) return;
@@ -109,89 +109,90 @@ function initTree() {
       placed.add(id);
     }
 
-    function getSpouse(p) {
+    function spouseOf(p) {
       const s = (p.spouseIds || []).map(x => getPerson(x.id)).find(Boolean);
       return s || null;
     }
 
-    function childrenOf(parentIds) {
+    function kidsOf(parentIds) {
       const key = parentIds.slice().sort().join('|');
-      return people.filter(c => {
-        const ck = (c.parentIds || []).slice().sort().join('|');
-        return ck === key;
-      });
+      return people.filter(c => (c.parentIds || []).slice().sort().join('|') === key);
     }
 
+    // Place a couple as a tight unit: male left, female right
     function placeCouple(p, centerX, y) {
       if (placed.has(p.id)) return null;
-      const spouse = getSpouse(p);
-      const male = (!spouse || p.gender === 'M') ? p : spouse;
-      const female = spouse ? (male === p ? spouse : p) : null;
-      place(male.id, centerX - (female ? 90 : 0), y);
-      if (female && !placed.has(female.id)) place(female.id, centerX + 90, y);
+      const sp = spouseOf(p);
+      const male = (!sp || p.gender === 'M') ? p : sp;
+      const female = sp ? (male === p ? sp : p) : null;
+      place(male.id, centerX - (female ? coupleGap / 2 : 0), y);
+      if (female && !placed.has(female.id)) place(female.id, centerX + coupleGap / 2, y);
       return { male, female, centerX, y };
     }
 
-    function placeKids(parentIds, centerX, y) {
-      const kids = childrenOf(parentIds).filter(k => !placed.has(k.id));
+    function placeChildren(parentIds, centerX, y) {
+      const kids = kidsOf(parentIds).filter(k => !placed.has(k.id));
       if (!kids.length) return;
+      // Half-siblings (fewer parents) to the left
       kids.sort((a, b) => (a.parentIds || []).length - (b.parentIds || []).length);
       const total = (kids.length - 1) * unitX;
       const startX = centerX - total / 2;
       kids.forEach((kid, i) => {
-        const kidX = startX + i * unitX;
-        placeCouple(kid, kidX, y);
-        const spouse = getSpouse(kid);
-        const pids = spouse ? [kid.id, spouse.id] : [kid.id];
-        placeKids(pids, kidX, y + genH);
+        const kx = startX + i * unitX;
+        placeCouple(kid, kx, y);
+        const sp = spouseOf(kid);
+        const pids = sp ? [kid.id, sp.id] : [kid.id];
+        placeChildren(pids, kx, y + genH);
       });
     }
 
-    // Roots
+    // Place root couples far apart
     const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
     let cursor = 0;
-    const rootCouples = [];
+    const couples = [];
     roots.forEach(r => {
       if (placed.has(r.id)) return;
-      const couple = placeCouple(r, cursor, 0);
-      if (couple) rootCouples.push(couple);
-      cursor += treeGap;
+      const c = placeCouple(r, cursor, 0);
+      if (c) { couples.push(c); cursor += unitX * 4; }
     });
 
-    rootCouples.forEach(c => {
+    // Children under each couple
+    couples.forEach(c => {
       const pids = c.female ? [c.male.id, c.female.id] : [c.male.id];
-      placeKids(pids, c.centerX, c.y + genH);
-      // Half-siblings (single parent = the male)
-      const halfKids = people.filter(k =>
-        (k.parentIds || []).length === 1 &&
-        k.parentIds[0] === c.male.id &&
-        !placed.has(k.id)
+      placeChildren(pids, c.centerX, genH);
+      // Single-parent children of the male (half-siblings) further left
+      const half = people.filter(k =>
+        (k.parentIds || []).length === 1 && k.parentIds[0] === c.male.id && !placed.has(k.id)
       );
-      if (halfKids.length) {
-        const startX = c.centerX - unitX * 2.4;
-        halfKids.forEach((k, i) => placeCouple(k, startX - i * unitX, c.y + genH));
-      }
+      half.forEach((k, i) => placeCouple(k, c.centerX - unitX * (2.5 + i), genH));
     });
 
-    // Move a root couple above its child if the child was placed elsewhere (as a spouse)
-    rootCouples.forEach(c => {
+    // If a root couple has exactly one child who is placed elsewhere (as a spouse),
+    // move the whole couple above that child — but only if it won't overlap another couple.
+    couples.forEach(c => {
       const pids = c.female ? [c.male.id, c.female.id] : [c.male.id];
-      const kids = childrenOf(pids);
-      if (kids.length === 1 && pos[kids[0].id] && pos[c.male.id]) {
-        const kidX = pos[kids[0].id].x;
-        const dx = kidX - pos[c.male.id].x;
-        if (Math.abs(dx) > 120) {
-          pos[c.male.id].x += dx;
-          if (c.female && pos[c.female.id]) pos[c.female.id].x += dx;
-        }
+      const kids = kidsOf(pids);
+      if (kids.length !== 1 || !pos[kids[0].id] || !pos[c.male.id]) return;
+      const kidX = pos[kids[0].id].x;
+      const dx = kidX - c.centerX;
+      if (Math.abs(dx) < 80) return;
+      // Check no other couple is near the target
+      const targetMaleX = pos[c.male.id].x + dx;
+      const conflict = Object.entries(pos).some(([id, p]) => {
+        if (id === c.male.id || (c.female && id === c.female.id)) return false;
+        return Math.abs(p.y - 0) < 30 && Math.abs(p.x - targetMaleX) < 200;
+      });
+      if (!conflict) {
+        pos[c.male.id].x += dx;
+        if (c.female && pos[c.female.id]) pos[c.female.id].x += dx;
       }
     });
 
     people.forEach(p => { if (!placed.has(p.id)) place(p.id, cursor, 0); });
 
-    // Collision push
+    // Push overlapping nodes apart
     const ids = Object.keys(pos);
-    for (let iter = 0; iter < 14; iter++) {
+    for (let iter = 0; iter < 16; iter++) {
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = pos[ids[i]], b = pos[ids[j]];
@@ -199,7 +200,7 @@ function initTree() {
           const dx = b.x - a.x;
           const dist = Math.abs(dx);
           if (dist < MIN_SEP && dist > 0.1) {
-            const push = (MIN_SEP - dist) / 2 + 8;
+            const push = (MIN_SEP - dist) / 2 + 10;
             if (dx > 0) { a.x -= push; b.x += push; }
             else { a.x += push; b.x -= push; }
           }
