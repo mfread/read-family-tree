@@ -64,7 +64,7 @@ function initTree() {
   const SEED = [
     { id: 'charles', name: 'Charles Francis Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'COPD and asthma', gender: 'M', parentIds: [], spouseIds: [{ id: 'judy', married: true }] },
     { id: 'judy', name: 'Judy Anne Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'Dementia (onset)', gender: 'F', parentIds: [], spouseIds: [{ id: 'charles', married: true }] },
-    { id: 'edward', name: 'Edward Read', dob: '~1931', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [], spouseIds: [] },
+    { id: 'edward', name: 'Edward Read', dob: '~1931', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles'], spouseIds: [] },
     { id: 'mark', name: 'Mark Francis Read', dob: '1963-07', birthLoc: 'Australia', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles', 'judy'], spouseIds: [{ id: 'merna', married: true }] },
     { id: 'merna', name: 'Merna Helena Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [], spouseIds: [{ id: 'mark', married: true }] },
     { id: 'donald', name: 'Donald Utton', dob: '', birthLoc: 'UK?', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles'], spouseIds: [] },
@@ -78,6 +78,8 @@ function initTree() {
   people.forEach(p => { if (!p.spouseIds) p.spouseIds = []; });
 
   let meId = sessionStorage.getItem('meId') || null;
+  let viewMode = 'both'; // both | paternal | maternal
+  let lineageId = null; // person whose lineage is highlighted
 
   const svg = d3.select('#chart');
   const g = svg.append('g');
@@ -91,13 +93,12 @@ function initTree() {
   function getPerson(id) { return people.find(p => p.id === id); }
   function isAlive(p) { return !p.dod || !p.dod.trim(); }
 
-  // Node dimensions (half)
   const HW = 70, HH = 28;
 
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const unitX = 220;
+    const unitX = 200;
 
     const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
 
@@ -116,19 +117,30 @@ function initTree() {
         if (placed.has(sp.id)) return;
         const putMaleLeft = (p.gender === 'M' && sp.gender !== 'M') || (sp.gender === 'F' && p.gender !== 'F');
         if (putMaleLeft || p.gender === 'M') {
-          placePerson(sp, x + unitX * 0.9, y);
+          placePerson(sp, x + unitX * 0.95, y);
         } else {
-          pos[p.id].x = x + unitX * 0.9;
+          pos[p.id].x = x + unitX * 0.95;
           placePerson(sp, x, y);
         }
       });
 
-      const children = people.filter(c => (c.parentIds || []).includes(p.id));
+      // Children of this person (any parent link)
+      let children = people.filter(c => (c.parentIds || []).includes(p.id) && !placed.has(c.id));
+      // Sort: half-siblings (only this parent) first so they appear left of full siblings
+      children.sort((a, b) => {
+        const aHalf = (a.parentIds || []).length === 1;
+        const bHalf = (b.parentIds || []).length === 1;
+        if (aHalf && !bHalf) return -1;
+        if (!aHalf && bHalf) return 1;
+        return 0;
+      });
+
       if (children.length) {
-        const childY = y + 180;
-        const startX = x - ((children.length - 1) * unitX) / 2;
+        const childY = y + 170;
+        const totalWidth = (children.length - 1) * unitX;
+        const startX = x - totalWidth / 2;
         children.forEach((child, i) => {
-          if (!placed.has(child.id)) layout(child, startX + i * unitX, childY);
+          layout(child, startX + i * unitX, childY);
         });
       }
     }
@@ -137,7 +149,7 @@ function initTree() {
     roots.forEach(r => {
       if (!placed.has(r.id)) {
         layout(r, rootX, 0);
-        rootX += unitX * 3;
+        rootX += unitX * 3.5;
       }
     });
     people.forEach(p => { if (!placed.has(p.id)) layout(p, rootX, 0); });
@@ -145,11 +157,48 @@ function initTree() {
     return pos;
   }
 
+  function getLineage(id, mode) {
+    if (!id) return new Set();
+    const set = new Set();
+    const person = getPerson(id);
+    if (!person) return set;
+    const wantGender = mode === 'paternal' ? 'M' : 'F';
+
+    function traceUp(pid) {
+      const p = getPerson(pid);
+      if (!p || set.has(pid)) return;
+      set.add(pid);
+      // Prefer same-gender parent for direct line
+      const parents = (p.parentIds || []).map(getPerson).filter(Boolean);
+      const same = parents.find(par => par.gender === wantGender);
+      if (same) traceUp(same.id);
+      else if (parents.length) traceUp(parents[0].id);
+    }
+
+    function traceDown(pid) {
+      const children = people.filter(c => (c.parentIds || []).includes(pid));
+      children.forEach(c => {
+        if (!set.has(c.id) && c.gender === wantGender) {
+          set.add(c.id);
+          traceDown(c.id);
+        }
+      });
+    }
+
+    if (person.gender === wantGender) {
+      set.add(id);
+      traceUp(id);
+      traceDown(id);
+    }
+    return set;
+  }
+
   function render() {
     g.selectAll('*').remove();
     const pos = computePositions();
+    const lineage = (viewMode !== 'both' && lineageId) ? getLineage(lineageId, viewMode) : null;
 
-    // Marriage lines — attach strictly outside the boxes
+    // Marriage lines
     const marriageLines = [];
     people.forEach(p => {
       (p.spouseIds || []).forEach(s => {
@@ -193,7 +242,7 @@ function initTree() {
         if (tip) tip.remove();
       });
 
-    // Child links + sibling bars — all attachment points outside boxes
+    // Child links
     const childLinks = [];
     const siblingBars = [];
     const byParents = {};
@@ -219,37 +268,23 @@ function initTree() {
       } else return;
 
       const kidYs = kids.map(k => pos[k.id].y);
-      const barY = Math.min(...kidYs) - HH - 20;
+      const barY = Math.min(...kidYs) - HH - 18;
 
-      // Vertical drop from couple (starts below boxes)
       childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: barY });
-
-      // Horizontal sibling bar (well above child boxes)
       const xs = kids.map(k => pos[k.id].x);
       siblingBars.push({ x1: Math.min(...xs), y1: barY, x2: Math.max(...xs), y2: barY });
-
-      // Verticals down to top of each child box
       kids.forEach(k => {
-        childLinks.push({
-          x1: pos[k.id].x,
-          y1: barY,
-          x2: pos[k.id].x,
-          y2: pos[k.id].y - HH - 2
-        });
+        childLinks.push({ x1: pos[k.id].x, y1: barY, x2: pos[k.id].x, y2: pos[k.id].y - HH - 2 });
       });
     });
 
-    g.selectAll('.child-link')
-      .data(childLinks)
-      .join('line')
+    g.selectAll('.child-link').data(childLinks).join('line')
       .attr('class', 'child-link')
       .attr('x1', d => d.x1).attr('y1', d => d.y1)
       .attr('x2', d => d.x2).attr('y2', d => d.y2)
       .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
 
-    g.selectAll('.sibling-bar')
-      .data(siblingBars)
-      .join('line')
+    g.selectAll('.sibling-bar').data(siblingBars).join('line')
       .attr('class', 'sibling-bar')
       .attr('x1', d => d.x1).attr('y1', d => d.y1)
       .attr('x2', d => d.x2).attr('y2', d => d.y2)
@@ -259,8 +294,21 @@ function initTree() {
     const node = g.selectAll('.node')
       .data(people.filter(p => pos[p.id]))
       .join('g')
-      .attr('class', d => 'node' + (d.id === meId ? ' me' : '') + (isAlive(d) ? ' alive' : ' dead'))
+      .attr('class', d => {
+        let cls = 'node' + (d.id === meId ? ' me' : '') + (isAlive(d) ? ' alive' : ' dead');
+        if (lineage && !lineage.has(d.id)) cls += ' greyed';
+        return cls;
+      })
       .attr('transform', d => `translate(${pos[d.id].x},${pos[d.id].y})`)
+      .on('click', (e, d) => {
+        e.stopPropagation();
+        if (viewMode === 'both') return;
+        const want = viewMode === 'paternal' ? 'M' : 'F';
+        if (d.gender !== want) return; // ignore illegal click
+        if (lineageId === d.id) lineageId = null;
+        else lineageId = d.id;
+        render();
+      })
       .on('contextmenu', (e, d) => { e.preventDefault(); showContextMenu(e, d.id); });
 
     node.append('rect').attr('x', -HW).attr('y', -HH).attr('width', HW * 2).attr('height', HH * 2);
@@ -296,6 +344,17 @@ function initTree() {
       svg.transition().duration(500).call(zoom.transform, t);
     }, 40);
   }
+
+  // View mode buttons
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      viewMode = btn.id.replace('view-', '');
+      lineageId = null;
+      render();
+    };
+  });
 
   const menu = document.getElementById('context-menu');
   let currentPersonId = null;
@@ -336,7 +395,12 @@ function initTree() {
   function openLinkModal(type, person) {
     const existing = people.filter(p => p.id !== person.id);
     const options = existing.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    const marriedHtml = type === 'spouse' ? `<label style="display:block;margin:8px 0;"><input type="checkbox" id="married-check" checked> Married</label>` : '';
+    const marriedHtml = type === 'spouse' ? `
+      <div style="margin:10px 0; display:flex; align-items:center; gap:10px;">
+        <label for="married-check" style="margin:0; cursor:pointer;">Married</label>
+        <input type="checkbox" id="married-check" checked style="width:auto; margin:0;">
+      </div>
+    ` : '';
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = `
@@ -466,6 +530,7 @@ function initTree() {
       save();
       meId = null;
       sessionStorage.removeItem('meId');
+      lineageId = null;
       render();
     }
   };

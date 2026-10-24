@@ -51,10 +51,31 @@ body {
   align-items: center;
   padding: 0 16px;
   z-index: 100;
-  gap: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 #header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
-#theme-toggle, button {
+#view-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+.view-btn {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--node-border);
+  padding: 4px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.view-btn.active {
+  background: var(--married);
+  color: white;
+  border-color: var(--married);
+}
+#theme-toggle, button:not(.view-btn) {
   background: var(--married);
   color: white;
   border: none;
@@ -79,6 +100,7 @@ button:hover { opacity: 0.9; }
 .node text { fill: var(--node-text); font-size: 13px; }
 .node.dead text { fill: var(--dead-text); }
 .node.me rect { stroke: var(--married); stroke-width: 3.5; }
+.node.greyed { opacity: 0.28; }
 .child-link { fill: none; stroke: var(--link); stroke-width: 1.5; }
 #context-menu {
   position: absolute;
