@@ -121,3 +121,45 @@ input, select, textarea {
   opacity: 0.6;
   z-index: 50;
 }
+
+/* Login overlay */
+#login-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+#login-box {
+  background: var(--node-bg);
+  padding: 32px;
+  border-radius: 12px;
+  border: 1px solid var(--node-border);
+  min-width: 300px;
+  text-align: center;
+}
+#login-box h2 { margin-top: 0; }
+#login-box input {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--fg);
+}
+#login-box button {
+  margin: 6px 4px;
+}
+#auth-error {
+  color: #dc3545;
+  font-size: 0.85rem;
+  min-height: 1.2em;
+}
+#user-email {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}

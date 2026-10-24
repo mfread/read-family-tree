@@ -10,41 +10,60 @@
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body data-theme="light">
-  <div id="header">
-    <h1>Read Family Tree</h1>
-    <button id="theme-toggle">Toggle Theme</button>
-    <button id="export-btn">Export JSON</button>
-    <button id="reset-btn">Reset to Seed</button>
-  </div>
-  <svg id="chart"></svg>
-  <div id="context-menu"></div>
-  <div id="modal">
-    <div id="modal-content">
-      <h3 id="modal-title">Edit Person</h3>
-      <form id="person-form">
-        <label>Name <input name="name" required></label>
-        <label>Date of Birth <input name="dob" placeholder="e.g. 1963-07 or July 1963"></label>
-        <label>Birth Location <input name="birthLoc"></label>
-        <label>Date of Death <input name="dod" placeholder="or blank if living"></label>
-        <label>Death Location <input name="deathLoc"></label>
-        <label>Death Reason <input name="deathReason"></label>
-        <label>Gender
-          <select name="gender">
-            <option value="">Unknown</option>
-            <option value="M">Male</option>
-            <option value="F">Female</option>
-            <option value="O">Other</option>
-          </select>
-        </label>
-        <div class="modal-buttons">
-          <button type="button" id="modal-cancel">Cancel</button>
-          <button type="submit">Save</button>
-        </div>
+  <!-- Login overlay -->
+  <div id="login-overlay">
+    <div id="login-box">
+      <h2>Read Family Tree</h2>
+      <p>Sign in to view</p>
+      <form id="login-form">
+        <input type="email" id="email" placeholder="Email" required autocomplete="email">
+        <input type="password" id="password" placeholder="Password" required autocomplete="current-password">
+        <button type="submit" id="login-btn">Sign in</button>
+        <button type="button" id="signup-btn">Create account</button>
       </form>
+      <p id="auth-error"></p>
     </div>
   </div>
-  <div id="footer">v0.01 • Data stored locally in your browser</div>
 
-  <script src="app.js"></script>
+  <div id="app" style="display:none;">
+    <div id="header">
+      <h1>Read Family Tree</h1>
+      <span id="user-email"></span>
+      <button id="logout-btn">Sign out</button>
+      <button id="theme-toggle">Toggle Theme</button>
+      <button id="export-btn">Export JSON</button>
+      <button id="reset-btn">Reset to Seed</button>
+    </div>
+    <svg id="chart"></svg>
+    <div id="context-menu"></div>
+    <div id="modal">
+      <div id="modal-content">
+        <h3 id="modal-title">Edit Person</h3>
+        <form id="person-form">
+          <label>Name <input name="name" required></label>
+          <label>Date of Birth <input name="dob" placeholder="e.g. 1963-07 or July 1963"></label>
+          <label>Birth Location <input name="birthLoc"></label>
+          <label>Date of Death <input name="dod" placeholder="or blank if living"></label>
+          <label>Death Location <input name="deathLoc"></label>
+          <label>Death Reason <input name="deathReason"></label>
+          <label>Gender
+            <select name="gender">
+              <option value="">Unknown</option>
+              <option value="M">Male</option>
+              <option value="F">Female</option>
+              <option value="O">Other</option>
+            </select>
+          </label>
+          <div class="modal-buttons">
+            <button type="button" id="modal-cancel">Cancel</button>
+            <button type="submit">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div id="footer">v0.01 • Data stored locally in your browser</div>
+  </div>
+
+  <script type="module" src="app.js"></script>
 </body>
 </html>
