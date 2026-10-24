@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Read Family Tree v0.01</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #222222;
+      --node-bg: #f8f9fa;
+      --node-border: #dee2e6;
+      --node-text: #212529;
+      --accent: #0d6efd;
+      --link: #adb5bd;
+      --menu-bg: #ffffff;
+      --menu-hover: #e9ecef;
+      --modal-bg: #ffffff;
+      --input-bg: #ffffff;
+      --input-border: #ced4da;
+    }
+    [data-theme="dark"] {
+      --bg: #1a1a1a;
+      --fg: #e0e0e0;
+      --node-bg: #2d2d2d;
+      --node-border: #444444;
+      --node-text: #e0e0e0;
+      --accent: #4dabf7;
+      --link: #555555;
+      --menu-bg: #2d2d2d;
+      --menu-hover: #3d3d3d;
+      --modal-bg: #2d2d2d;
+      --input-bg: #3d3d3d;
+      --input-border: #555555;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      overflow: hidden;
+      transition: background 0.3s, color 0.3s;
+    }
+    #header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 50px;
+      background: var(--node-bg);
+      border-bottom: 1px solid var(--node-border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      z-index: 100;
+      gap: 16px;
+    }
+    #header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+    #theme-toggle, button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    button:hover { opacity: 0.9; }
+    #chart { width: 100vw; height: 100vh; }
+    .node rect {
+      fill: var(--node-bg);
+      stroke: var(--node-border);
+      stroke-width: 1.5;
+      rx: 6;
+      ry: 6;
+    }
+    .node text { fill: var(--node-text); font-size: 13px; }
+    .node.me rect { stroke: var(--accent); stroke-width: 3; }
+    .link { fill: none; stroke: var(--link); stroke-width: 1.5; }
+    #context-menu {
+      position: absolute;
+      background: var(--menu-bg);
+      border: 1px solid var(--node-border);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 200;
+      min-width: 160px;
+      display: none;
+    }
+    #context-menu div {
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    #context-menu div:hover { background: var(--menu-hover); }
+    #modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal.show { display: flex; }
+    #modal-content {
+      background: var(--modal-bg);
+      padding: 24px;
+      border-radius: 10px;
+      min-width: 320px;
+      max-width: 90vw;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    }
+    #modal-content h3 { margin-top: 0; }
+    label { display: block; margin: 8px 0 4px; font-size: 0.9rem; }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--input-border);
+      border-radius: 4px;
+      background: var(--input-bg);
+      color: var(--fg);
+      font-size: 0.95rem;
+    }
+    .modal-buttons { margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end; }
+    #footer {
+      position: fixed;
+      bottom: 8px; right: 12px;
+      font-size: 0.75rem;
+      opacity: 0.6;
+      z-index: 50;
+    }
+  </style>
+</head>
+<body data-theme="light">
+  <div id="header">
+    <h1>Read Family Tree</h1>
+    <button id="theme-toggle">Toggle Theme</button>
+    <button id="export-btn">Export JSON</button>
+    <button id="reset-btn">Reset to Seed</button>
+  </div>
+  <svg id="chart"></svg>
+  <div id="context-menu"></div>
+  <div id="modal">
+    <div id="modal-content">
+      <h3 id="modal-title">Edit Person</h3>
+      <form id="person-form">
+        <label>Name <input name="name" required></label>
+        <label>Date of Birth <input name="dob" placeholder="e.g. 1963-07 or July 1963"></label>
+        <label>Birth Location <input name="birthLoc"></label>
+        <label>Date of Death <input name="dod" placeholder="or blank if living"></label>
+        <label>Death Location <input name="deathLoc"></label>
+        <label>Death Reason <input name="deathReason"></label>
+        <label>Gender
+          <select name="gender">
+            <option value="">Unknown</option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+            <option value="O">Other</option>
+          </select>
+        </label>
+        <div class="modal-buttons">
+          <button type="button" id="modal-cancel">Cancel</button>
+          <button type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div id="footer">v0.01 • Data stored locally in your browser</div>
+
+  <script>
+    const SEED = [
+      { id: 'charles', name: 'Charles Francis Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'COPD and asthma', gender: 'M', parentIds: [] },
+      { id: 'judy', name: 'Judy Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'Dementia (onset)', gender: 'F', parentIds: [] },
+      { id: 'edward', name: 'Edward Read', dob: '~1931', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [] },
+      { id: 'mark', name: 'Mark Francis Read', dob: '1963-07', birthLoc: 'Australia', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles', 'judy'] },
+      { id: 'merna', name: 'Merna Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [] },
+      { id: 'donald', name: 'Donald Utton', dob: '', birthLoc: 'UK?', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles'] },
+      { id: 'vanessa', name: 'Vanessa', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: ['charles', 'judy'] },
+      { id: 'matthew', name: 'Matthew Read', dob: '~1993', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'] },
+      { id: 'mitchell', name: 'Mitchell Read', dob: '~1994', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'] },
+      { id: 'michael', name: 'Michael Read', dob: '~1999', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'] }
+    ];
+
+    let people = JSON.parse(localStorage.getItem('familyTree') || 'null') || SEED.map(p => ({...p}));
+    let meId = sessionStorage.getItem('meId') || null;
+
+    const svg = d3.select('#chart');
+    const g = svg.append('g');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    svg.attr('viewBox', [0, 0, width, height]);
+
+    const zoom = d3.zoom().scaleExtent([0.2, 3]).on('zoom', (e) => g.attr('transform', e.transform));
+    svg.call(zoom);
+
+    function save() {
+      localStorage.setItem('familyTree', JSON.stringify(people));
+    }
+
+    function buildHierarchy() {
+      const byId = Object.fromEntries(people.map(p => [p.id, {...p, children: []}]));
+      const roots = [];
+      people.forEach(p => {
+        const node = byId[p.id];
+        if (!p.parentIds || p.parentIds.length === 0) {
+          roots.push(node);
+        } else {
+          const parent = byId[p.parentIds[0]];
+          if (parent) parent.children.push(node);
+          else roots.push(node);
+        }
+      });
+      if (roots.length > 1) {
+        return d3.hierarchy({ id: '__root', name: '', children: roots });
+      } else if (roots.length === 1) {
+        return d3.hierarchy(roots[0]);
+      }
+      return d3.hierarchy({ id: '__empty', name: 'No data', children: [] });
+    }
+
+    function render() {
+      g.selectAll('*').remove();
+      const root = buildHierarchy();
+      const treeLayout = d3.tree().nodeSize([180, 120]).separation((a, b) => a.parent === b.parent ? 1 : 1.2);
+      treeLayout(root);
+
+      const nodes = root.descendants().filter(d => d.data.id !== '__root' && d.data.id !== '__empty');
+      const links = root.links().filter(l => l.source.data.id !== '__root');
+
+      g.selectAll('.link')
+        .data(links)
+        .join('path')
+        .attr('class', 'link')
+        .attr('d', d3.linkVertical().x(d => d.x).y(d => d.y));
+
+      const node = g.selectAll('.node')
+        .data(nodes)
+        .join('g')
+        .attr('class', d => 'node' + (d.data.id === meId ? ' me' : ''))
+        .attr('transform', d => `translate(${d.x},${d.y})`)
+        .on('contextmenu', (e, d) => {
+          e.preventDefault();
+          showContextMenu(e, d.data);
+        })
+        .on('click', (e, d) => {
+        });
+
+      node.append('rect')
+        .attr('x', -70).attr('y', -25).attr('width', 140).attr('height', 50);
+
+      node.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.3em')
+        .text(d => d.data.name || 'Unnamed')
+        .call(wrapText, 130);
+
+      setTimeout(() => {
+        if (meId) {
+          const meNode = nodes.find(n => n.data.id === meId);
+          if (meNode) {
+            const t = d3.zoomIdentity
+              .translate(width / 2 - meNode.x * 1.5, height / 2 - meNode.y * 1.5)
+              .scale(1.5);
+            svg.transition().duration(600).call(zoom.transform, t);
+            return;
+          }
+        }
+        if (nodes.length) {
+          const xs = nodes.map(n => n.x);
+          const ys = nodes.map(n => n.y);
+          const minX = Math.min(...xs) - 100, maxX = Math.max(...xs) + 100;
+          const minY = Math.min(...ys) - 50, maxY = Math.max(...ys) + 50;
+          const dx = maxX - minX, dy = maxY - minY;
+          const scale = Math.min(0.9, Math.min((width - 100) / dx, (height - 100) / dy));
+          const t = d3.zoomIdentity
+            .translate((width - dx * scale) / 2 - minX * scale, (height - dy * scale) / 2 - minY * scale + 40)
+            .scale(scale);
+          svg.transition().duration(600).call(zoom.transform, t);
+        }
+      }, 50);
+    }
+
+    function wrapText(text, width) {
+      text.each(function() {
+        const text = d3.select(this);
+        const words = text.text().split(/\s+/).reverse();
+        let word, line = [], lineNumber = 0, lineHeight = 1.1, y = text.attr('y') || 0, dy = parseFloat(text.attr('dy') || 0);
+        let tspan = text.text(null).append('tspan').attr('x', 0).attr('y', y).attr('dy', dy + 'em');
+        while (word = words.pop()) {
+          line.push(word);
+          tspan.text(line.join(' '));
+          if (tspan.node().getComputedTextLength() > width) {
+            line.pop();
+            tspan.text(line.join(' '));
+            line = [word];
+            tspan = text.append('tspan').attr('x', 0).attr('y', y).attr('dy', ++lineNumber * lineHeight + dy + 'em').text(word);
+          }
+        }
+      });
+    }
+
+    const menu = document.getElementById('context-menu');
+    let currentPerson = null;
+
+    function showContextMenu(e, person) {
+      currentPerson = person;
+      menu.innerHTML = `
+        <div data-action="setme">Set as Me</div>
+        <div data-action="edit">Edit Properties</div>
+        <div data-action="addchild">Add Child</div>
+        <div data-action="addparent">Add Parent</div>
+        <div data-action="addsibling">Add Sibling</div>
+      `;
+      menu.style.display = 'block';
+      menu.style.left = e.pageX + 'px';
+      menu.style.top = e.pageY + 'px';
+    }
+
+    document.addEventListener('click', () => menu.style.display = 'none');
+    menu.addEventListener('click', (e) => {
+      const action = e.target.dataset.action;
+      if (!action || !currentPerson) return;
+      menu.style.display = 'none';
+      if (action === 'setme') {
+        meId = currentPerson.id;
+        sessionStorage.setItem('meId', meId);
+        render();
+      } else if (action === 'edit') {
+        openModal(currentPerson, 'Edit');
+      } else if (action === 'addchild') {
+        openModal(null, 'Add Child', { parentIds: [currentPerson.id] });
+      } else if (action === 'addparent') {
+        openModal(null, 'Add Parent', { asParentOf: currentPerson.id });
+      } else if (action === 'addsibling') {
+        openModal(null, 'Add Sibling', { parentIds: currentPerson.parentIds || [] });
+      }
+    });
+
+    const modal = document.getElementById('modal');
+    const form = document.getElementById('person-form');
+    let editing = null;
+    let extra = {};
+
+    function openModal(person, title, extras = {}) {
+      editing = person;
+      extra = extras;
+      document.getElementById('modal-title').textContent = title + (person ? ': ' + person.name : '');
+      form.reset();
+      if (person) {
+        form.name.value = person.name || '';
+        form.dob.value = person.dob || '';
+        form.birthLoc.value = person.birthLoc || '';
+        form.dod.value = person.dod || '';
+        form.deathLoc.value = person.deathLoc || '';
+        form.deathReason.value = person.deathReason || '';
+        form.gender.value = person.gender || '';
+      }
+      modal.classList.add('show');
+    }
+
+    document.getElementById('modal-cancel').onclick = () => modal.classList.remove('show');
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const data = {
+        name: form.name.value.trim(),
+        dob: form.dob.value.trim(),
+        birthLoc: form.birthLoc.value.trim(),
+        dod: form.dod.value.trim(),
+        deathLoc: form.deathLoc.value.trim(),
+        deathReason: form.deathReason.value.trim(),
+        gender: form.gender.value
+      };
+      if (editing) {
+        Object.assign(editing, data);
+      } else {
+        const id = 'p' + Date.now();
+        const newP = { id, parentIds: extra.parentIds || [], ...data };
+        people.push(newP);
+        if (extra.asParentOf) {
+          const child = people.find(p => p.id === extra.asParentOf);
+          if (child) {
+            child.parentIds = child.parentIds || [];
+            if (!child.parentIds.includes(id)) child.parentIds.push(id);
+          }
+        }
+      }
+      save();
+      modal.classList.remove('show');
+      render();
+    };
+
+    const themeToggle = document.getElementById('theme-toggle');
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.body.dataset.theme = savedTheme;
+    themeToggle.onclick = () => {
+      const next = document.body.dataset.theme === 'light' ? 'dark' : 'light';
+      document.body.dataset.theme = next;
+      localStorage.setItem('theme', next);
+    };
+
+    document.getElementById('export-btn').onclick = () => {
+      const blob = new Blob([JSON.stringify(people, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'read-family-tree.json';
+      a.click();
+    };
+    document.getElementById('reset-btn').onclick = () => {
+      if (confirm('Reset to initial seed data? This will overwrite your local changes.')) {
+        people = SEED.map(p => ({...p}));
+        save();
+        meId = null;
+        sessionStorage.removeItem('meId');
+        render();
+      }
+    };
+
+    render();
+    window.addEventListener('resize', () => { });
+  </script>
+</body>
+</html>
