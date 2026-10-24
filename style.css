@@ -1,10 +1,13 @@
 :root {
   --bg: #ffffff;
   --fg: #222222;
-  --node-bg: #f8f9fa;
-  --node-border: #dee2e6;
-  --node-text: #212529;
-  --accent: #0d6efd;
+  --node-bg: #ffffff;
+  --node-border: #222222;
+  --node-text: #222222;
+  --dead-bg: #dc3545;
+  --dead-text: #ffffff;
+  --married: #0d6efd;
+  --unmarried: #fd7e14;
   --link: #adb5bd;
   --menu-bg: #ffffff;
   --menu-hover: #e9ecef;
@@ -15,10 +18,13 @@
 [data-theme="dark"] {
   --bg: #1a1a1a;
   --fg: #e0e0e0;
-  --node-bg: #2d2d2d;
-  --node-border: #444444;
-  --node-text: #e0e0e0;
-  --accent: #4dabf7;
+  --node-bg: #000000;
+  --node-border: #ffffff;
+  --node-text: #ffffff;
+  --dead-bg: #dc3545;
+  --dead-text: #ffffff;
+  --married: #4dabf7;
+  --unmarried: #ffb74d;
   --link: #555555;
   --menu-bg: #2d2d2d;
   --menu-hover: #3d3d3d;
@@ -49,7 +55,7 @@ body {
 }
 #header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
 #theme-toggle, button {
-  background: var(--accent);
+  background: var(--married);
   color: white;
   border: none;
   padding: 6px 12px;
@@ -62,13 +68,18 @@ button:hover { opacity: 0.9; }
 .node rect {
   fill: var(--node-bg);
   stroke: var(--node-border);
-  stroke-width: 1.5;
+  stroke-width: 2;
   rx: 6;
   ry: 6;
 }
+.node.dead rect {
+  fill: var(--dead-bg);
+  stroke: var(--dead-bg);
+}
 .node text { fill: var(--node-text); font-size: 13px; }
-.node.me rect { stroke: var(--accent); stroke-width: 3; }
-.link { fill: none; stroke: var(--link); stroke-width: 1.5; }
+.node.dead text { fill: var(--dead-text); }
+.node.me rect { stroke: var(--married); stroke-width: 3.5; }
+.child-link { fill: none; stroke: var(--link); stroke-width: 1.5; }
 #context-menu {
   position: absolute;
   background: var(--menu-bg);
@@ -121,8 +132,6 @@ input, select, textarea {
   opacity: 0.6;
   z-index: 50;
 }
-
-/* Login overlay */
 #login-overlay {
   position: fixed;
   inset: 0;
@@ -151,9 +160,7 @@ input, select, textarea {
   background: var(--input-bg);
   color: var(--fg);
 }
-#login-box button {
-  margin: 6px 4px;
-}
+#login-box button { margin: 6px 4px; }
 #auth-error {
   color: #dc3545;
   font-size: 0.85rem;
