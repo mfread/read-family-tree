@@ -281,19 +281,31 @@ function initTree() {
       let midX, fromY;
       if (parents.length >= 2 && pos[parents[0].id] && pos[parents[1].id]) {
         midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
-        // Start the drop from the marriage line itself (centre y of the couple)
-        fromY = pos[parents[0].id].y;
+        fromY = pos[parents[0].id].y; // from marriage line
       } else if (parents[0] && pos[parents[0].id]) {
         midX = pos[parents[0].id].x;
         fromY = pos[parents[0].id].y + HH + 4;
       } else return;
 
+      const kidXs = kids.map(k => pos[k.id].x);
       const kidYs = kids.map(k => pos[k.id].y);
       const barY = Math.min(...kidYs) - HH - 18;
+      const barLeft = Math.min(...kidXs);
+      const barRight = Math.max(...kidXs);
 
+      // Vertical drop from parents to bar level
       childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: barY });
-      const xs = kids.map(k => pos[k.id].x);
-      siblingBars.push({ x1: Math.min(...xs), y1: barY, x2: Math.max(...xs), y2: barY });
+
+      // Horizontal connector from parents' midpoint to the sibling bar (handles distant placement)
+      const connectX = midX < barLeft ? barLeft : (midX > barRight ? barRight : midX);
+      if (Math.abs(midX - connectX) > 2) {
+        childLinks.push({ x1: midX, y1: barY, x2: connectX, y2: barY });
+      }
+
+      // Sibling bar
+      siblingBars.push({ x1: barLeft, y1: barY, x2: barRight, y2: barY });
+
+      // Drops to each child
       kids.forEach(k => {
         childLinks.push({ x1: pos[k.id].x, y1: barY, x2: pos[k.id].x, y2: pos[k.id].y - HH - 2 });
       });
