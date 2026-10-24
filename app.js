@@ -99,8 +99,9 @@ function initTree() {
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const unitX = 260;
+    const unitX = 280;
     const genH = 260;
+    const treeGap = 480;
 
     function place(id, x, y) {
       if (placed.has(id)) return;
@@ -108,74 +109,103 @@ function initTree() {
       placed.add(id);
     }
 
-    function getChildren(parentId) {
-      return people.filter(c => (c.parentIds || []).includes(parentId) && !placed.has(c.id));
-    }
-
     function getSpouse(p) {
       const s = (p.spouseIds || []).map(x => getPerson(x.id)).find(Boolean);
-      return s && !placed.has(s.id) ? s : null;
+      return s || null;
     }
 
-    // Place a person (and spouse) then centre their children underneath
-    function layoutCouple(p, centerX, y) {
-      if (placed.has(p.id)) return;
+    function childrenOf(parentIds) {
+      const key = parentIds.slice().sort().join('|');
+      return people.filter(c => {
+        const ck = (c.parentIds || []).slice().sort().join('|');
+        return ck === key;
+      });
+    }
+
+    function placeCouple(p, centerX, y) {
+      if (placed.has(p.id)) return null;
       const spouse = getSpouse(p);
       const male = (!spouse || p.gender === 'M') ? p : spouse;
       const female = spouse ? (male === p ? spouse : p) : null;
+      place(male.id, centerX - (female ? 90 : 0), y);
+      if (female && !placed.has(female.id)) place(female.id, centerX + 90, y);
+      return { male, female, centerX, y };
+    }
 
-      place(male.id, centerX - (female ? unitX * 0.45 : 0), y);
-      if (female) place(female.id, centerX + unitX * 0.45, y);
-
-      // Children of either parent
-      const kids = [...new Set([
-        ...getChildren(p.id),
-        ...(spouse ? getChildren(spouse.id) : [])
-      ])];
+    function placeKids(parentIds, centerX, y) {
+      const kids = childrenOf(parentIds).filter(k => !placed.has(k.id));
       if (!kids.length) return;
-
       kids.sort((a, b) => (a.parentIds || []).length - (b.parentIds || []).length);
       const total = (kids.length - 1) * unitX;
       const startX = centerX - total / 2;
       kids.forEach((kid, i) => {
-        layoutCouple(kid, startX + i * unitX, y + genH);
+        const kidX = startX + i * unitX;
+        placeCouple(kid, kidX, y);
+        const spouse = getSpouse(kid);
+        const pids = spouse ? [kid.id, spouse.id] : [kid.id];
+        placeKids(pids, kidX, y + genH);
       });
     }
 
-    // Roots = people with no parents
+    // Roots
     const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
     let cursor = 0;
+    const rootCouples = [];
     roots.forEach(r => {
       if (placed.has(r.id)) return;
-      layoutCouple(r, cursor, 0);
-      // Advance cursor past this subtree
-      const xs = Object.values(pos).map(p => p.x);
-      cursor = (xs.length ? Math.max(...xs) : cursor) + unitX * 5;
+      const couple = placeCouple(r, cursor, 0);
+      if (couple) rootCouples.push(couple);
+      cursor += treeGap;
     });
 
-    // Anything left
-    people.forEach(p => {
-      if (!placed.has(p.id)) place(p.id, cursor, 0);
+    rootCouples.forEach(c => {
+      const pids = c.female ? [c.male.id, c.female.id] : [c.male.id];
+      placeKids(pids, c.centerX, c.y + genH);
+      // Half-siblings (single parent = the male)
+      const halfKids = people.filter(k =>
+        (k.parentIds || []).length === 1 &&
+        k.parentIds[0] === c.male.id &&
+        !placed.has(k.id)
+      );
+      if (halfKids.length) {
+        const startX = c.centerX - unitX * 2.4;
+        halfKids.forEach((k, i) => placeCouple(k, startX - i * unitX, c.y + genH));
+      }
     });
 
-    // Light collision push on same row
+    // Move a root couple above its child if the child was placed elsewhere (as a spouse)
+    rootCouples.forEach(c => {
+      const pids = c.female ? [c.male.id, c.female.id] : [c.male.id];
+      const kids = childrenOf(pids);
+      if (kids.length === 1 && pos[kids[0].id] && pos[c.male.id]) {
+        const kidX = pos[kids[0].id].x;
+        const dx = kidX - pos[c.male.id].x;
+        if (Math.abs(dx) > 120) {
+          pos[c.male.id].x += dx;
+          if (c.female && pos[c.female.id]) pos[c.female.id].x += dx;
+        }
+      }
+    });
+
+    people.forEach(p => { if (!placed.has(p.id)) place(p.id, cursor, 0); });
+
+    // Collision push
     const ids = Object.keys(pos);
-    for (let iter = 0; iter < 6; iter++) {
+    for (let iter = 0; iter < 14; iter++) {
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = pos[ids[i]], b = pos[ids[j]];
-          if (Math.abs(a.y - b.y) > 30) continue;
+          if (Math.abs(a.y - b.y) > 40) continue;
           const dx = b.x - a.x;
           const dist = Math.abs(dx);
           if (dist < MIN_SEP && dist > 0.1) {
-            const push = (MIN_SEP - dist) / 2 + 2;
+            const push = (MIN_SEP - dist) / 2 + 8;
             if (dx > 0) { a.x -= push; b.x += push; }
             else { a.x += push; b.x -= push; }
           }
         }
       }
     }
-
     return pos;
   }
 
@@ -281,11 +311,15 @@ function initTree() {
       const kids = group.children.filter(k => pos[k.id]);
       if (!kids.length) return;
 
-      // Every child has two parents
-      if (parents.length < 2 || !pos[parents[0].id] || !pos[parents[1].id]) return;
-      // Drop starts from the parent linkage line (centre between the two parents)
-      const fromY = pos[parents[0].id].y;
-      const midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
+      // Prefer the linkage line between two parents; fall back to the single parent
+      let fromY, midX;
+      if (parents.length >= 2 && pos[parents[0].id] && pos[parents[1].id]) {
+        fromY = pos[parents[0].id].y;
+        midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
+      } else if (parents[0] && pos[parents[0].id]) {
+        fromY = pos[parents[0].id].y + HH + 4;
+        midX = pos[parents[0].id].x;
+      } else return;
 
       const kidXs = kids.map(k => pos[k.id].x);
       const minKidY = Math.min(...kids.map(k => pos[k.id].y));
