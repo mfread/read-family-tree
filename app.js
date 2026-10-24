@@ -153,6 +153,20 @@ function initTree() {
     });
     people.forEach(p => { if (!placed.has(p.id)) layout(p, rootX, 0); });
 
+    // Force children to sit below their parents (fixes cases where a child was placed as a root or spouse first)
+    people.forEach(child => {
+      if (!child.parentIds || !child.parentIds.length || !pos[child.id]) return;
+      const parents = child.parentIds.map(id => pos[id]).filter(Boolean);
+      if (!parents.length) return;
+      const maxParentY = Math.max(...parents.map(p => p.y));
+      if (pos[child.id].y <= maxParentY + 80) {
+        pos[child.id].y = maxParentY + 180;
+        // Centre under the parents (or under the couple midpoint)
+        const midX = parents.reduce((s, p) => s + p.x, 0) / parents.length;
+        pos[child.id].x = midX;
+      }
+    });
+
     const ids = Object.keys(pos);
     for (let iter = 0; iter < 8; iter++) {
       for (let i = 0; i < ids.length; i++) {
@@ -293,19 +307,19 @@ function initTree() {
       const barLeft = Math.min(...kidXs);
       const barRight = Math.max(...kidXs);
 
-      // Private bar for this parent group only — sits between parents and children
-      // and does not share the line used by other parent groups
-      const barY = fromY + Math.max(30, (minKidY - fromY) * 0.45);
+      // Private bar for this parent group — offset so it does not share another group's line
+      const gap = minKidY - fromY;
+      const barY = fromY + Math.max(40, gap * 0.55);
 
-      // Vertical drop from parents to their private bar
+      // Vertical drop from the marriage line (or single parent) to the private bar
       childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: barY });
 
-      // Horizontal only across this group's children (or to the single child)
+      // Horizontal only for this group's children
       const hLeft = Math.min(midX, barLeft);
       const hRight = Math.max(midX, barRight);
       childLinks.push({ x1: hLeft, y1: barY, x2: hRight, y2: barY });
 
-      // Drop from the private bar to each child of this group
+      // Drop from the private bar to each child
       kids.forEach(k => {
         childLinks.push({ x1: pos[k.id].x, y1: barY, x2: pos[k.id].x, y2: pos[k.id].y - HH - 2 });
       });
