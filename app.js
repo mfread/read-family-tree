@@ -14,18 +14,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-const ALLOWED_EMAILS = [
-  "mfread@gmail.com",
-];
+const ALLOWED_EMAILS = ["mfread@gmail.com"];
 
 const loginOverlay = document.getElementById("login-overlay");
 const appDiv = document.getElementById("app");
 const authError = document.getElementById("auth-error");
 const userEmailSpan = document.getElementById("user-email");
 
-function showError(msg) {
-  authError.textContent = msg;
-}
+function showError(msg) { authError.textContent = msg; }
 
 function showApp(user) {
   loginOverlay.style.display = "none";
@@ -56,28 +52,19 @@ onAuthStateChanged(auth, (user) => {
 document.getElementById("login-form").onsubmit = async (e) => {
   e.preventDefault();
   showError("");
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
   try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (err) {
-    showError(err.message);
-  }
+    await signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("password").value);
+  } catch (err) { showError(err.message); }
 };
 
 document.getElementById("signup-btn").onclick = async () => {
   showError("");
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
-  if (!email || !password) {
-    showError("Enter email and password first.");
-    return;
-  }
+  if (!email || !password) { showError("Enter email and password first."); return; }
   try {
     await createUserWithEmailAndPassword(auth, email, password);
-  } catch (err) {
-    showError(err.message);
-  }
+  } catch (err) { showError(err.message); }
 };
 
 document.getElementById("logout-btn").onclick = () => signOut(auth);
@@ -102,7 +89,6 @@ function initTree() {
   ];
 
   let people = JSON.parse(localStorage.getItem('familyTree') || 'null') || SEED.map(p => ({...p}));
-  // Ensure spouseIds exists on loaded data
   people.forEach(p => { if (!p.spouseIds) p.spouseIds = []; });
 
   let meId = sessionStorage.getItem('meId') || null;
@@ -116,104 +102,71 @@ function initTree() {
   const zoom = d3.zoom().scaleExtent([0.2, 3]).on('zoom', (e) => g.attr('transform', e.transform));
   svg.call(zoom);
 
-  function save() {
-    localStorage.setItem('familyTree', JSON.stringify(people));
-  }
-
-  function getPerson(id) {
-    return people.find(p => p.id === id);
-  }
+  function save() { localStorage.setItem('familyTree', JSON.stringify(people)); }
+  function getPerson(id) { return people.find(p => p.id === id); }
 
   function buildHierarchy() {
     const byId = Object.fromEntries(people.map(p => [p.id, {...p, children: []}]));
     const roots = [];
     people.forEach(p => {
       const node = byId[p.id];
-      if (!p.parentIds || p.parentIds.length === 0) {
-        roots.push(node);
-      } else {
+      if (!p.parentIds || p.parentIds.length === 0) roots.push(node);
+      else {
         const parent = byId[p.parentIds[0]];
         if (parent) parent.children.push(node);
         else roots.push(node);
       }
     });
-    if (roots.length > 1) {
-      return d3.hierarchy({ id: '__root', name: '', children: roots });
-    } else if (roots.length === 1) {
-      return d3.hierarchy(roots[0]);
-    }
+    if (roots.length > 1) return d3.hierarchy({ id: '__root', name: '', children: roots });
+    if (roots.length === 1) return d3.hierarchy(roots[0]);
     return d3.hierarchy({ id: '__empty', name: 'No data', children: [] });
   }
 
   function render() {
     g.selectAll('*').remove();
     const root = buildHierarchy();
-    const treeLayout = d3.tree().nodeSize([180, 140]).separation((a, b) => a.parent === b.parent ? 1 : 1.2);
-    treeLayout(root);
+    d3.tree().nodeSize([180, 140]).separation((a, b) => a.parent === b.parent ? 1 : 1.2)(root);
 
     const nodes = root.descendants().filter(d => d.data.id !== '__root' && d.data.id !== '__empty');
     const links = root.links().filter(l => l.source.data.id !== '__root');
 
-    g.selectAll('.link')
-      .data(links)
-      .join('path')
-      .attr('class', 'link')
-      .attr('d', d3.linkVertical().x(d => d.x).y(d => d.y));
+    g.selectAll('.link').data(links).join('path').attr('class', 'link').attr('d', d3.linkVertical().x(d => d.x).y(d => d.y));
 
-    const node = g.selectAll('.node')
-      .data(nodes)
-      .join('g')
+    const node = g.selectAll('.node').data(nodes).join('g')
       .attr('class', d => 'node' + (d.data.id === meId ? ' me' : ''))
       .attr('transform', d => `translate(${d.x},${d.y})`)
-      .on('contextmenu', (e, d) => {
-        e.preventDefault();
-        showContextMenu(e, d.data.id);
-      });
+      .on('contextmenu', (e, d) => { e.preventDefault(); showContextMenu(e, d.data.id); });
 
-    node.append('rect')
-      .attr('x', -75).attr('y', -30).attr('width', 150).attr('height', 60);
+    node.append('rect').attr('x', -75).attr('y', -30).attr('width', 150).attr('height', 60);
 
-    node.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', '-0.2em')
-      .text(d => d.data.name || 'Unnamed')
-      .call(wrapText, 140);
+    node.append('text').attr('text-anchor', 'middle').attr('dy', '-0.2em')
+      .text(d => d.data.name || 'Unnamed').call(wrapText, 140);
 
-    // Show spouses under name
-    node.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', '1.2em')
-      .attr('font-size', '10px')
-      .attr('fill', 'var(--link)')
+    node.append('text').attr('text-anchor', 'middle').attr('dy', '1.2em').attr('font-size', '10px').attr('fill', 'var(--link)')
       .text(d => {
         const spouses = (d.data.spouseIds || []).map(s => {
           const sp = getPerson(s.id);
-          return sp ? (s.married ? '❤ ' : '') + sp.name.split(' ')[0] : '';
+          return sp ? (s.married ? '\u2764 ' : '') + sp.name.split(' ')[0] : '';
         }).filter(Boolean);
-        return spouses.length ? spouses.join(', ') : '';
+        return spouses.join(', ');
       });
 
     setTimeout(() => {
       if (meId) {
         const meNode = nodes.find(n => n.data.id === meId);
         if (meNode) {
-          const t = d3.zoomIdentity
-            .translate(width / 2 - meNode.x * 1.4, height / 2 - meNode.y * 1.4)
-            .scale(1.4);
+          const t = d3.zoomIdentity.translate(width / 2 - meNode.x * 1.4, height / 2 - meNode.y * 1.4).scale(1.4);
           svg.transition().duration(600).call(zoom.transform, t);
           return;
         }
       }
       if (nodes.length) {
-        const xs = nodes.map(n => n.x);
-        const ys = nodes.map(n => n.y);
+        const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
         const minX = Math.min(...xs) - 100, maxX = Math.max(...xs) + 100;
         const minY = Math.min(...ys) - 50, maxY = Math.max(...ys) + 50;
         const dx = maxX - minX, dy = maxY - minY;
         const scale = Math.min(0.9, Math.min((width - 100) / dx, (height - 100) / dy));
-        const t = d3.zoomIdentity
-          .translate((width - dx * scale) / 2 - minX * scale, (height - dy * scale) / 2 - minY * scale + 40)
-          .scale(scale);
+        const t = d3.zoomIdentity.translate((width - dx * scale) / 2 - minX * scale, (height - dy * scale) / 2 - minY * scale + 40).scale(scale);
         svg.transition().duration(600).call(zoom.transform, t);
       }
     }, 50);
@@ -269,54 +222,49 @@ function initTree() {
       sessionStorage.setItem('meId', meId);
       render();
     } else if (action === 'edit') {
-      openModal(person, 'Edit');
+      openEditModal(person);
     } else if (action === 'addchild') {
       openLinkModal('child', person);
     } else if (action === 'addparent') {
       openLinkModal('parent', person);
     } else if (action === 'addsibling') {
-      openModal(null, 'Add Sibling', { parentIds: person.parentIds || [] });
+      openEditModal(null, 'Add Sibling', { parentIds: person.parentIds || [] });
     } else if (action === 'linkspouse') {
       openLinkModal('spouse', person);
     }
   });
 
-  // Link existing or create new
+  // Separate simple link dialog that does not destroy the person form
   function openLinkModal(type, person) {
     const existing = people.filter(p => p.id !== person.id);
     const options = existing.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    const marriedOption = type === 'spouse' ? `
-      <label><input type="checkbox" id="married-check" checked> Married</label>
-    ` : '';
+    const marriedHtml = type === 'spouse' ? `<label style="display:block;margin:8px 0;"><input type="checkbox" id="married-check" checked> Married</label>` : '';
 
-    const html = `
-      <h3>Link ${type} to ${person.name}</h3>
-      <p>Select existing person or create new:</p>
-      <select id="existing-select"><option value="">-- Create new --</option>${options}</select>
-      ${marriedOption}
-      <div style="margin-top:12px;">
-        <button type="button" id="link-cancel">Cancel</button>
-        <button type="button" id="link-ok">OK</button>
+    const overlay = document.createElement('div');
+    overlay.id = 'link-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML = `
+      <div style="background:var(--modal-bg);padding:24px;border-radius:10px;min-width:280px;">
+        <h3>Link ${type} to ${person.name}</h3>
+        <p>Select existing or create new:</p>
+        <select id="existing-select" style="width:100%;padding:8px;margin:8px 0;"><option value="">-- Create new --</option>${options}</select>
+        ${marriedHtml}
+        <div style="margin-top:12px;text-align:right;">
+          <button type="button" id="link-cancel">Cancel</button>
+          <button type="button" id="link-ok">OK</button>
+        </div>
       </div>
     `;
-    const modalContent = document.getElementById('modal-content');
-    const original = modalContent.innerHTML;
-    modalContent.innerHTML = html;
-    document.getElementById('modal').classList.add('show');
+    document.body.appendChild(overlay);
 
-    document.getElementById('link-cancel').onclick = () => {
-      document.getElementById('modal').classList.remove('show');
-      modalContent.innerHTML = original;
-    };
-
-    document.getElementById('link-ok').onclick = () => {
-      const sel = document.getElementById('existing-select').value;
-      const married = document.getElementById('married-check') ? document.getElementById('married-check').checked : true;
-      document.getElementById('modal').classList.remove('show');
-      modalContent.innerHTML = original;
+    overlay.querySelector('#link-cancel').onclick = () => overlay.remove();
+    overlay.querySelector('#link-ok').onclick = () => {
+      const sel = overlay.querySelector('#existing-select').value;
+      const marriedEl = overlay.querySelector('#married-check');
+      const married = marriedEl ? marriedEl.checked : true;
+      overlay.remove();
 
       if (sel) {
-        // Link existing
         const other = getPerson(sel);
         if (type === 'child') {
           other.parentIds = other.parentIds || [];
@@ -333,22 +281,21 @@ function initTree() {
         save();
         render();
       } else {
-        // Create new
-        if (type === 'child') openModal(null, 'Add Child', { parentIds: [person.id] });
-        else if (type === 'parent') openModal(null, 'Add Parent', { asParentOf: person.id });
-        else if (type === 'spouse') openModal(null, 'Add Spouse', { asSpouseOf: person.id, married });
+        if (type === 'child') openEditModal(null, 'Add Child', { parentIds: [person.id] });
+        else if (type === 'parent') openEditModal(null, 'Add Parent', { asParentOf: person.id });
+        else if (type === 'spouse') openEditModal(null, 'Add Spouse', { asSpouseOf: person.id, married });
       }
     };
   }
 
   const modal = document.getElementById('modal');
-  const form = document.getElementById('person-form');
   let editing = null;
   let extra = {};
 
-  function openModal(person, title, extras = {}) {
+  function openEditModal(person, title = 'Edit', extras = {}) {
     editing = person;
     extra = extras;
+    const form = document.getElementById('person-form');
     document.getElementById('modal-title').textContent = title + (person ? ': ' + person.name : '');
     form.reset();
     if (person) {
@@ -363,9 +310,10 @@ function initTree() {
     modal.classList.add('show');
   }
 
-  document.getElementById('modal-cancel').onclick = () => modal.classList.remove('show');
-  form.onsubmit = (e) => {
+  // Bind form once, and it always works because we never destroy the form
+  document.getElementById('person-form').onsubmit = (e) => {
     e.preventDefault();
+    const form = e.target;
     const data = {
       name: form.name.value.trim(),
       dob: form.dob.value.trim(),
@@ -376,7 +324,6 @@ function initTree() {
       gender: form.gender.value
     };
     if (editing) {
-      // Update by id so the source array is mutated
       const real = getPerson(editing.id);
       if (real) Object.assign(real, data);
     } else {
@@ -403,6 +350,8 @@ function initTree() {
     modal.classList.remove('show');
     render();
   };
+
+  document.getElementById('modal-cancel').onclick = () => modal.classList.remove('show');
 
   const themeToggle = document.getElementById('theme-toggle');
   const savedTheme = localStorage.getItem('theme') || 'light';
@@ -431,5 +380,4 @@ function initTree() {
   };
 
   render();
-  window.addEventListener('resize', () => {});
 }
