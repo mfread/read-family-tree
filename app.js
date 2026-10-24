@@ -79,8 +79,7 @@ function initTree() {
     { id: 'michael', name: 'Michael Luke Read', dob: '~1999', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] }
   ];
 
-  localStorage.removeItem('familyTree');
-  let people = [{ id: 'me', name: 'Me', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [], spouseIds: [] }];
+  let people = JSON.parse(localStorage.getItem('familyTree') || 'null') || [{ id: 'me', name: 'Me', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [], spouseIds: [] }];
   people.forEach(p => { if (!p.spouseIds) p.spouseIds = []; });
 
   // Fix half-siblings: if Don/Ed only list Charles, attach them to a previous partner
