@@ -305,16 +305,16 @@ function initTree() {
       byParents[key].children.push(child);
     });
 
-    // Assign a unique bar height to each parent group so trees stay separate
+    // One clean connector per parent group: drop from linkage, bar, drop to children
     const groups = Object.values(byParents);
     groups.forEach((group, gi) => {
       const parents = group.parents.map(id => getPerson(id)).filter(Boolean);
       const kids = group.children.filter(k => pos[k.id]);
       if (!kids.length) return;
 
-      // Prefer the linkage line between two parents; fall back to the single parent
       let fromY, midX;
       if (parents.length >= 2 && pos[parents[0].id] && pos[parents[1].id]) {
+        // Start from the centre of the linkage line between the two parents
         fromY = pos[parents[0].id].y;
         midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
       } else if (parents[0] && pos[parents[0].id]) {
@@ -324,72 +324,32 @@ function initTree() {
 
       const kidXs = kids.map(k => pos[k.id].x);
       const minKidY = Math.min(...kids.map(k => pos[k.id].y));
-      const kidSpan = Math.max(...kidXs) - Math.min(...kidXs);
-      const distToKids = Math.abs(midX - (Math.min(...kidXs) + Math.max(...kidXs)) / 2);
+      // Bar sits in the gap between parents and children, offset per group so they don't stack
+      const gap = Math.max(80, minKidY - fromY);
+      const barY = fromY + 40 + gi * 28;
+      const safeBarY = Math.min(barY, minKidY - HH - 20);
 
-      // Prefer a high bar when the children are far away so the long horizontal stays clear
-      let barY;
-      if (distToKids > 250) {
-        barY = fromY + 55 + gi * 32;
-      } else {
-        const available = Math.max(60, minKidY - fromY - HH - 30);
-        barY = fromY + 50 + (gi * (available / Math.max(1, groups.length)));
-      }
-      const safeBarY = Math.min(barY, minKidY - HH - 24);
+      // Vertical from linkage line down to bar
+      g.append('line').attr('class', 'child-link')
+        .attr('x1', midX).attr('y1', fromY)
+        .attr('x2', midX).attr('y2', safeBarY)
+        .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
 
-      // Vertical from parents to private bar
-      childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: safeBarY, type: 'v' });
-
-      // Horizontal only across this group's children
+      // Horizontal bar across this group's children only
       const hLeft = Math.min(midX, ...kidXs);
       const hRight = Math.max(midX, ...kidXs);
-      childLinks.push({ x1: hLeft, y1: safeBarY, x2: hRight, y2: safeBarY, type: 'h' });
+      g.append('line').attr('class', 'child-link')
+        .attr('x1', hLeft).attr('y1', safeBarY)
+        .attr('x2', hRight).attr('y2', safeBarY)
+        .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
 
-      // Drop to each child
+      // Drop from bar to each child
       kids.forEach(k => {
-        childLinks.push({ x1: pos[k.id].x, y1: safeBarY, x2: pos[k.id].x, y2: pos[k.id].y - HH - 2, type: 'v' });
-      });
-    });
-
-    // Draw lines; where a horizontal crosses a vertical of another group, insert a bridge
-    const verticals = childLinks.filter(l => l.type === 'v');
-    childLinks.forEach(link => {
-      if (link.type !== 'h') {
-        g.append('line')
-          .attr('class', 'child-link')
-          .attr('x1', link.x1).attr('y1', link.y1)
-          .attr('x2', link.x2).attr('y2', link.y2)
-          .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
-        return;
-      }
-      // Find crossings
-      const crossings = verticals
-        .filter(v => v.x1 > Math.min(link.x1, link.x2) + 4 && v.x1 < Math.max(link.x1, link.x2) - 4
-                  && link.y1 > Math.min(v.y1, v.y2) && link.y1 < Math.max(v.y1, v.y2))
-        .map(v => v.x1)
-        .sort((a, b) => a - b);
-
-      let x = Math.min(link.x1, link.x2);
-      const end = Math.max(link.x1, link.x2);
-      crossings.forEach(cx => {
-        if (cx - 8 > x) {
-          g.append('line').attr('class', 'child-link')
-            .attr('x1', x).attr('y1', link.y1).attr('x2', cx - 8).attr('y2', link.y1)
-            .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
-        }
-        // Bridge semicircle over the crossing
-        const bridge = d3.path();
-        bridge.moveTo(cx - 8, link.y1);
-        bridge.arc(cx, link.y1, 8, Math.PI, 0, true);
-        g.append('path').attr('d', bridge.toString())
-          .attr('fill', 'none').attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
-        x = cx + 8;
-      });
-      if (x < end) {
         g.append('line').attr('class', 'child-link')
-          .attr('x1', x).attr('y1', link.y1).attr('x2', end).attr('y2', link.y1)
+          .attr('x1', pos[k.id].x).attr('y1', safeBarY)
+          .attr('x2', pos[k.id].x).attr('y2', pos[k.id].y - HH - 2)
           .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
-      }
+      });
     });
 
     const node = g.selectAll('.node')
