@@ -222,3 +222,23 @@ body:has(.f3-form) #js-error {
 .f3-form .f3-edit-toggle,
 .f3-form button[title="Edit"] { display: none !important; }
 
+
+/* hide library form buttons we replace */
+.f3-edit-btn,
+.f3-add-relative-btn,
+.f3-remove-relative-btn { display: none !important; }
+/* modern form look */
+.f3-form {
+  font-family: system-ui, -apple-system, sans-serif !important;
+  border-radius: 8px !important;
+}
+.f3-form input, .f3-form select {
+  border-radius: 4px !important;
+  border: 1px solid #444 !important;
+  padding: 8px !important;
+}
+.f3-form button {
+  border-radius: 4px !important;
+  font-weight: 500 !important;
+}
+
