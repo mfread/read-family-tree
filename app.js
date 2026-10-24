@@ -281,7 +281,8 @@ function initTree() {
       let midX, fromY;
       if (parents.length >= 2 && pos[parents[0].id] && pos[parents[1].id]) {
         midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
-        fromY = Math.max(pos[parents[0].id].y, pos[parents[1].id].y) + HH + 4;
+        // Start the drop from the marriage line itself (centre y of the couple)
+        fromY = pos[parents[0].id].y;
       } else if (parents[0] && pos[parents[0].id]) {
         midX = pos[parents[0].id].x;
         fromY = pos[parents[0].id].y + HH + 4;
