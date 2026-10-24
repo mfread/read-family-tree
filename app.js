@@ -155,9 +155,31 @@ function initTree() {
       });
     }
 
-    // Any remaining (spouses of different gens etc.)
+    // Any remaining
     people.forEach(p => {
       if (!placed.has(p.id)) place(p.id, 0, (gen[p.id] || 0) * genH);
+    });
+
+    // Enforce parents/spouses side-by-side: male left, female right
+    const paired = new Set();
+    people.forEach(p => {
+      (p.spouseIds || []).forEach(s => {
+        const other = getPerson(s.id);
+        if (!other || !pos[p.id] || !pos[other.id]) return;
+        const key = [p.id, other.id].sort().join('|');
+        if (paired.has(key)) return;
+        paired.add(key);
+
+        const male = (p.gender === 'M' && other.gender !== 'M') ? p :
+                     (other.gender === 'M' && p.gender !== 'M') ? other : p;
+        const female = male === p ? other : p;
+        const midX = (pos[p.id].x + pos[other.id].x) / 2;
+        const y = Math.min(pos[p.id].y, pos[other.id].y);
+        pos[male.id].x = midX - unitX * 0.45;
+        pos[female.id].x = midX + unitX * 0.45;
+        pos[male.id].y = y;
+        pos[female.id].y = y;
+      });
     });
 
     // Collision push on same generation
