@@ -182,23 +182,48 @@ function initTree() {
 
     people.forEach(p => { if (!placed.has(p.id)) place(p.id, cursor, 0); });
 
-    // Collision push
-    const ids = Object.keys(pos);
-    for (let iter = 0; iter < 20; iter++) {
-      for (let i = 0; i < ids.length; i++) {
-        for (let j = i + 1; j < ids.length; j++) {
-          const a = pos[ids[i]], b = pos[ids[j]];
+    // Re-centre each sibling group under their parents, then push whole clusters apart
+    const groups = {};
+    people.forEach(p => {
+      if (!p.parentIds || !p.parentIds.length || !pos[p.id]) return;
+      const key = p.parentIds.slice().sort().join('|');
+      if (!groups[key]) groups[key] = { parents: p.parentIds, kids: [] };
+      groups[key].kids.push(p);
+    });
+    Object.values(groups).forEach(g => {
+      const parentPos = g.parents.map(id => pos[id]).filter(Boolean);
+      if (!parentPos.length) return;
+      const parentMid = parentPos.reduce((s, p) => s + p.x, 0) / parentPos.length;
+      const kidMid = g.kids.reduce((s, k) => s + pos[k.id].x, 0) / g.kids.length;
+      const dx = parentMid - kidMid;
+      // Only shift if the group has drifted far from its parents
+      if (Math.abs(dx) > 40) {
+        g.kids.forEach(k => { pos[k.id].x += dx; });
+      }
+    });
+
+    // Push clusters apart if their bounding boxes overlap
+    const clusters = Object.values(groups).map(g => {
+      const xs = g.kids.map(k => pos[k.id].x);
+      return { kids: g.kids, minX: Math.min(...xs), maxX: Math.max(...xs), y: pos[g.kids[0].id].y };
+    });
+    for (let iter = 0; iter < 8; iter++) {
+      for (let i = 0; i < clusters.length; i++) {
+        for (let j = i + 1; j < clusters.length; j++) {
+          const a = clusters[i], b = clusters[j];
           if (Math.abs(a.y - b.y) > 40) continue;
-          const dx = b.x - a.x;
-          const dist = Math.abs(dx);
-          if (dist < MIN_SEP && dist > 0.1) {
-            const push = (MIN_SEP - dist) / 2 + 12;
-            if (dx > 0) { a.x -= push; b.x += push; }
-            else { a.x += push; b.x -= push; }
+          const gap = 80;
+          if (a.maxX + gap > b.minX && a.minX < b.maxX) {
+            const push = (a.maxX + gap - b.minX) / 2 + 10;
+            a.kids.forEach(k => { pos[k.id].x -= push; });
+            b.kids.forEach(k => { pos[k.id].x += push; });
+            a.minX -= push; a.maxX -= push;
+            b.minX += push; b.maxX += push;
           }
         }
       }
     }
+
     return pos;
   }
 
