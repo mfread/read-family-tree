@@ -159,7 +159,7 @@ function initTree() {
       .setCardHtml()
       .setCardDisplay([["first name", "last name"], ["birthday"]]);
     f3Chart.editTree()
-      .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname", {id:"gender", label:"gender", type:"select", options:["M","F"]}])
+      .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname", {id:"gender", label:"Gender", type:"select", options:["Male","Female"]}])
       .setEditFirst(true)
       .setCardClickOpen(f3Card);
     f3Chart.updateTree({ initial: true });
