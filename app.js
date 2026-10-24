@@ -109,9 +109,12 @@ function initTree() {
   }
 
   function fromF3(f3Data) {
+    if (!Array.isArray(f3Data)) return people;
     return f3Data.map(d => {
+      if (!d || !d.data) return null;
       const name = [d.data["first name"], d.data["last name"]].filter(Boolean).join(' ');
-      const spouseIds = (d.rels.spouses || []).map(id => ({ id, married: true }));
+      const rels = d.rels || {};
+      const spouseIds = (rels.spouses || []).map(id => ({ id, married: true }));
       return {
         id: d.id,
         name,
@@ -120,12 +123,12 @@ function initTree() {
         deathReason: d.data["death reason"] || '',
         marriedSurname: d.data["married surname"] || '',
         gender: d.data.gender || '',
-        parentIds: d.rels.parents || [],
+        parentIds: rels.parents || [],
         spouseIds,
         birthLoc: '',
         deathLoc: ''
       };
-    });
+    }).filter(Boolean);
   }
 
   const data = toF3(people);
@@ -155,11 +158,13 @@ function initTree() {
   const store = f3Chart.store;
   if (store && store.setOnUpdate) {
     store.setOnUpdate(() => {
-      const tree = store.getTree();
-      if (tree && tree.data) {
-        people = fromF3(tree.data);
-        localStorage.setItem('familyTree', JSON.stringify(people));
-      }
+      try {
+        const tree = store.getTree();
+        if (tree && Array.isArray(tree.data)) {
+          people = fromF3(tree.data);
+          localStorage.setItem('familyTree', JSON.stringify(people));
+        }
+      } catch (e) { console.warn('save skipped', e); }
     });
   }
 
