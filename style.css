@@ -198,3 +198,13 @@ input, select, textarea {
 /* hide undo/redo history controls */
 .f3-history-controls { display: none !important; }
 
+
+/* inline gender radios */
+.f3-form .f3-gender-toggle,
+.f3-form label:has(input[type="radio"]) {
+  display: inline-flex !important;
+  align-items: center;
+  margin-right: 16px;
+}
+/* icon tooltips via title attribute we will set */
+
