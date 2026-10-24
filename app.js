@@ -153,18 +153,29 @@ function initTree() {
     });
     people.forEach(p => { if (!placed.has(p.id)) layout(p, rootX, 0); });
 
-    // Force children to sit below their parents (fixes cases where a child was placed as a root or spouse first)
+    // Place any child who ended up at the wrong generation under their parents, avoiding collisions
     people.forEach(child => {
       if (!child.parentIds || !child.parentIds.length || !pos[child.id]) return;
-      const parents = child.parentIds.map(id => pos[id]).filter(Boolean);
-      if (!parents.length) return;
-      const maxParentY = Math.max(...parents.map(p => p.y));
-      if (pos[child.id].y <= maxParentY + 80) {
-        pos[child.id].y = maxParentY + 180;
-        // Centre under the parents (or under the couple midpoint)
-        const midX = parents.reduce((s, p) => s + p.x, 0) / parents.length;
-        pos[child.id].x = midX;
+      const parentPos = child.parentIds.map(id => pos[id]).filter(Boolean);
+      if (!parentPos.length) return;
+      const maxParentY = Math.max(...parentPos.map(p => p.y));
+      if (pos[child.id].y > maxParentY + 60) return; // already below
+
+      const midX = parentPos.reduce((s, p) => s + p.x, 0) / parentPos.length;
+      let targetY = maxParentY + 180;
+      let targetX = midX;
+
+      // Nudge sideways until no collision with existing nodes at that generation
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const conflict = Object.entries(pos).some(([id, p]) => {
+          if (id === child.id) return false;
+          return Math.abs(p.y - targetY) < 50 && Math.abs(p.x - targetX) < MIN_SEP;
+        });
+        if (!conflict) break;
+        targetX = midX + (attempt % 2 === 0 ? 1 : -1) * Math.ceil(attempt / 2) * MIN_SEP;
       }
+      pos[child.id].x = targetX;
+      pos[child.id].y = targetY;
     });
 
     const ids = Object.keys(pos);
@@ -307,9 +318,10 @@ function initTree() {
       const barLeft = Math.min(...kidXs);
       const barRight = Math.max(...kidXs);
 
-      // Private bar for this parent group — offset so it does not share another group's line
+      // Private bar — offset by a small amount so different parent groups don't share a line
+      const groupIndex = Object.keys(byParents).indexOf(group.parents.slice().sort().join('|'));
       const gap = minKidY - fromY;
-      const barY = fromY + Math.max(40, gap * 0.55);
+      const barY = fromY + Math.max(36, gap * 0.5) + (groupIndex % 3) * 14;
 
       // Vertical drop from the marriage line (or single parent) to the private bar
       childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: barY });
