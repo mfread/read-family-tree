@@ -165,13 +165,13 @@ function initTree() {
     f3Chart.updateTree({ initial: true });
     // Set titles on form icons
     const setIconTitles = () => {
-      document.querySelectorAll('.f3-form button, .f3-form svg').forEach(el => {
-        if (!el.title) {
-          const cls = el.className || '';
-          if (cls.includes('add') || el.querySelector('[class*="add"]')) el.title = 'Add relative';
-          else if (cls.includes('edit') || el.querySelector('[class*="edit"]')) el.title = 'Edit';
-          else if (cls.includes('close') || el.textContent === '×') el.title = 'Close';
-        }
+      document.querySelectorAll('.f3-form button').forEach(el => {
+        if (el.title) return;
+        const cls = (el.className && el.className.baseVal) || el.className || '';
+        const s = String(cls);
+        if (s.includes('add')) el.title = 'Add relative';
+        else if (s.includes('edit')) el.title = 'Edit';
+        else if (s.includes('close') || el.textContent.trim() === '×') el.title = 'Close';
       });
     };
     setTimeout(setIconTitles, 500);
