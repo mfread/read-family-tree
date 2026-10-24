@@ -158,11 +158,27 @@ function initTree() {
     const f3Card = f3Chart
       .setCardHtml()
       .setCardDisplay([["first name", "last name"], ["birthday"]]);
-    f3Chart.editTree()
-      .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname", {id:"gender", label:"Gender", type:"select", options:["Male","Female"]}])
+    const edit = f3Chart.editTree()
+      .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname"])
       .setEditFirst(true)
       .setCardClickOpen(f3Card);
     f3Chart.updateTree({ initial: true });
+
+    // Rename Submit -> Save and auto-close form after submit
+    const observer = new MutationObserver(() => {
+      document.querySelectorAll('.f3-form button[type="submit"]').forEach(btn => {
+        if (btn.textContent.trim() === 'Submit') btn.textContent = 'Save';
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    document.addEventListener('click', (e) => {
+      if (e.target && e.target.matches && e.target.matches('.f3-form button[type="submit"]')) {
+        setTimeout(() => {
+          if (edit.closeForm) edit.closeForm();
+          f3Chart.updateTree({});
+        }, 100);
+      }
+    });
     status.textContent = 'Chart ready (' + data.length + ')';
     setTimeout(() => status.remove(), 3000);
   } catch (err) {
