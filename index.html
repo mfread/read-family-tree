@@ -5,10 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet">
-  <title>Read Family Tree v0.07</title>
+  <title>Read Family Tree v0.071</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://unpkg.com/family-chart@latest/dist/styles/family-chart.css">
-  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/family-chart@0.9.0/dist/styles/family-chart.css">
+  <script type="importmap">
+  {
+    "imports": {
+      "d3": "https://cdn.jsdelivr.net/npm/d3@7/+esm"
+    }
+  }
+  </script>
 </head>
 <body data-theme="dark">
   <div id="login-overlay">
@@ -29,12 +35,18 @@
     <div id="header">
       <h1>Read Family Tree</h1>
       <span id="user-email"></span>
+      <div id="view-controls">
+        <span>View:</span>
+        <button id="view-both" class="view-btn active">Both</button>
+        <button id="view-paternal" class="view-btn">Paternal</button>
+        <button id="view-maternal" class="view-btn">Maternal</button>
+      </div>
       <button id="logout-btn">Sign out</button>
       <button id="theme-toggle">Toggle Theme</button>
       <button id="export-btn">Export JSON</button>
     </div>
     <div id="chart" class="f3" style="width:100%;height:calc(100vh - 50px);margin:auto;"></div>
-    <div id="footer">v0.07 • Powered by family-chart</div>
+    <div id="footer">v0.071 • Powered by family-chart</div>
   </div>
 
   <script type="module" src="app.js"></script>
