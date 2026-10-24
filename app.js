@@ -66,12 +66,13 @@ function initTree() {
   document.body.appendChild(status);
 
   const SEED = [
-    { id: 'charles', name: 'Charles Francis Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'COPD and asthma', gender: 'M', parentIds: [], spouseIds: [{ id: 'judy', married: true }] },
+    { id: 'charles', name: 'Charles Francis Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'COPD and asthma', gender: 'M', parentIds: [], spouseIds: [{ id: 'charles-prev', married: false }, { id: 'judy', married: true }] },
     { id: 'judy', name: 'Judy Anne Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'Dementia (onset)', gender: 'F', parentIds: [], spouseIds: [{ id: 'charles', married: true }] },
-    { id: 'edward', name: 'Edward Read', dob: '~1931', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles'], spouseIds: [] },
+    { id: 'charles-prev', name: 'Previous partner', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [], spouseIds: [{ id: 'charles', married: false }] },
+    { id: 'edward', name: 'Edward Read', dob: '~1931', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles', 'charles-prev'], spouseIds: [] },
     { id: 'mark', name: 'Mark Francis Read', dob: '1963-07', birthLoc: 'Australia', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles', 'judy'], spouseIds: [{ id: 'merna', married: true }] },
     { id: 'merna', name: 'Merna Helena Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [], spouseIds: [{ id: 'mark', married: true }] },
-    { id: 'donald', name: 'Donald Utton', dob: '', birthLoc: 'UK?', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles'], spouseIds: [] },
+    { id: 'donald', name: 'Donald Utton', dob: '', birthLoc: 'UK?', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles', 'charles-prev'], spouseIds: [] },
     { id: 'vanessa', name: 'Vanessa Anne Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: ['charles', 'judy'], spouseIds: [] },
     { id: 'matthew', name: 'Matthew Mark Read', dob: '~1993', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] },
     { id: 'mitchell', name: 'Mitchell John Read', dob: '~1994', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] },
@@ -80,6 +81,21 @@ function initTree() {
 
   let people = JSON.parse(localStorage.getItem('familyTree') || 'null') || SEED.map(p => ({...p}));
   people.forEach(p => { if (!p.spouseIds) p.spouseIds = []; });
+
+  // Fix half-siblings: if Don/Ed only list Charles, attach them to a previous partner
+  if (!people.find(p => p.id === 'charles-prev')) {
+    people.push({ id: 'charles-prev', name: 'Previous partner', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [], spouseIds: [{ id: 'charles', married: false }] });
+  }
+  people.forEach(p => {
+    if ((p.id === 'edward' || p.id === 'donald') && (!p.parentIds || p.parentIds.length < 2)) {
+      p.parentIds = ['charles', 'charles-prev'];
+    }
+  });
+  const charles = people.find(p => p.id === 'charles');
+  if (charles && !charles.spouseIds.find(s => s.id === 'charles-prev')) {
+    charles.spouseIds.unshift({ id: 'charles-prev', married: false });
+  }
+
 
   function toF3(people) {
     return people.map(p => {
@@ -138,12 +154,13 @@ function initTree() {
   let f3Chart;
   try {
     f3Chart = f3.createChart('#chart', data, { main_id: meId });
-    f3Chart
+    const f3Card = f3Chart
       .setCardHtml()
       .setCardDisplay([["first name", "last name"], ["birthday"]]);
     f3Chart.editTree()
       .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname", "gender"])
-      .setEditFirst(false);
+      .setEditFirst(true)
+      .setCardClickOpen(f3Card);
     f3Chart.updateTree({ initial: true });
     status.textContent = 'Chart ready (' + data.length + ')';
     setTimeout(() => status.remove(), 3000);
