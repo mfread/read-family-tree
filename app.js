@@ -305,16 +305,23 @@ function initTree() {
 
       // Every child has two parents
       if (parents.length < 2 || !pos[parents[0].id] || !pos[parents[1].id]) return;
-      // Drop starts from just below the parent boxes so the line is always below the parents
-      const parentBottom = Math.max(pos[parents[0].id].y, pos[parents[1].id].y) + HH + 6;
-      const fromY = parentBottom;
+      // Drop starts from the parent linkage line (centre between the two parents)
+      const fromY = pos[parents[0].id].y;
       const midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
 
       const kidXs = kids.map(k => pos[k.id].x);
       const minKidY = Math.min(...kids.map(k => pos[k.id].y));
-      // Evenly space bars between parent bottom and children
-      const available = Math.max(40, minKidY - fromY - HH - 20);
-      const barY = fromY + 30 + (gi * (available / Math.max(1, groups.length)));
+      const kidSpan = Math.max(...kidXs) - Math.min(...kidXs);
+      const distToKids = Math.abs(midX - (Math.min(...kidXs) + Math.max(...kidXs)) / 2);
+
+      // Prefer a high bar when the children are far away so the long horizontal stays clear
+      let barY;
+      if (distToKids > 250) {
+        barY = fromY + 40 + gi * 18;
+      } else {
+        const available = Math.max(40, minKidY - fromY - HH - 20);
+        barY = fromY + 36 + (gi * (available / Math.max(1, groups.length)));
+      }
       const safeBarY = Math.min(barY, minKidY - HH - 16);
 
       // Vertical from parents to private bar
