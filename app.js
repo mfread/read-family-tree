@@ -102,87 +102,65 @@ function initTree() {
     const unitX = 200;
     const genH = 220;
 
-    // Generation = longest path from a root
-    const gen = {};
-    function depth(id, seen = new Set()) {
-      if (gen[id] != null) return gen[id];
-      if (seen.has(id)) return 0;
-      seen.add(id);
-      const p = getPerson(id);
-      if (!p || !p.parentIds || !p.parentIds.length) { gen[id] = 0; return 0; }
-      const d = Math.max(...p.parentIds.map(pid => depth(pid, seen))) + 1;
-      gen[id] = d;
-      return d;
-    }
-    people.forEach(p => depth(p.id));
-
     function place(id, x, y) {
       if (placed.has(id)) return;
       pos[id] = { x, y };
       placed.add(id);
     }
 
-    // Place generation by generation — people with parents stay on their generation row
-    const maxGen = Math.max(...Object.values(gen), 0);
-    for (let g = 0; g <= maxGen; g++) {
-      const members = people.filter(p => gen[p.id] === g && !placed.has(p.id));
-      const groups = {};
-      members.forEach(p => {
-        const key = (p.parentIds || []).slice().sort().join('|') || 'root';
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(p);
-      });
+    function getChildren(parentId) {
+      return people.filter(c => (c.parentIds || []).includes(parentId) && !placed.has(c.id));
+    }
 
-      let cursorX = 0;
-      Object.values(groups).forEach(group => {
-        group.sort((a, b) => (a.parentIds || []).length - (b.parentIds || []).length);
-        const startX = cursorX;
-        group.forEach((p, i) => {
-          const x = startX + i * unitX;
-          place(p.id, x, g * genH);
-        });
-        cursorX = startX + group.length * unitX + unitX * 2;
+    function getSpouse(p) {
+      const s = (p.spouseIds || []).map(x => getPerson(x.id)).find(Boolean);
+      return s && !placed.has(s.id) ? s : null;
+    }
+
+    // Place a person (and spouse) then centre their children underneath
+    function layoutCouple(p, centerX, y) {
+      if (placed.has(p.id)) return;
+      const spouse = getSpouse(p);
+      const male = (!spouse || p.gender === 'M') ? p : spouse;
+      const female = spouse ? (male === p ? spouse : p) : null;
+
+      place(male.id, centerX - (female ? unitX * 0.45 : 0), y);
+      if (female) place(female.id, centerX + unitX * 0.45, y);
+
+      // Children of either parent
+      const kids = [...new Set([
+        ...getChildren(p.id),
+        ...(spouse ? getChildren(spouse.id) : [])
+      ])];
+      if (!kids.length) return;
+
+      kids.sort((a, b) => (a.parentIds || []).length - (b.parentIds || []).length);
+      const total = (kids.length - 1) * unitX;
+      const startX = centerX - total / 2;
+      kids.forEach((kid, i) => {
+        layoutCouple(kid, startX + i * unitX, y + genH);
       });
     }
 
-    // Any remaining (people with no parents who weren't placed)
-    people.forEach(p => {
-      if (!placed.has(p.id)) place(p.id, 0, (gen[p.id] || 0) * genH);
+    // Roots = people with no parents
+    const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
+    let cursor = 0;
+    roots.forEach(r => {
+      if (placed.has(r.id)) return;
+      layoutCouple(r, cursor, 0);
+      // Advance cursor past this subtree
+      const xs = Object.values(pos).map(p => p.x);
+      cursor = (xs.length ? Math.max(...xs) : cursor) + unitX * 3;
     });
 
-    // Place spouses side-by-side. The person with parents keeps their generation.
-    // A spouse without parents is moved to the partner's row. Male left, female right.
-    const paired = new Set();
+    // Anything left
     people.forEach(p => {
-      (p.spouseIds || []).forEach(s => {
-        const other = getPerson(s.id);
-        if (!other || !pos[p.id] || !pos[other.id]) return;
-        const key = [p.id, other.id].sort().join('|');
-        if (paired.has(key)) return;
-        paired.add(key);
-
-        // Prefer the generation of the one who has parents
-        const pHasParents = (p.parentIds || []).length > 0;
-        const oHasParents = (other.parentIds || []).length > 0;
-        let y;
-        if (pHasParents && !oHasParents) y = pos[p.id].y;
-        else if (oHasParents && !pHasParents) y = pos[other.id].y;
-        else y = Math.min(pos[p.id].y, pos[other.id].y);
-
-        const male = (p.gender === 'M' && other.gender !== 'M') ? p :
-                     (other.gender === 'M' && p.gender !== 'M') ? other : p;
-        const female = male === p ? other : p;
-        const midX = (pos[p.id].x + pos[other.id].x) / 2;
-        pos[male.id].x = midX - unitX * 0.45;
-        pos[female.id].x = midX + unitX * 0.45;
-        pos[male.id].y = y;
-        pos[female.id].y = y;
-      });
+      if (!placed.has(p.id)) place(p.id, cursor, 0);
     });
 
-    // Collision push on same generation
+    // Light collision push on same row
     const ids = Object.keys(pos);
-    for (let iter = 0; iter < 10; iter++) {
+    for (let iter = 0; iter < 6; iter++) {
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = pos[ids[i]], b = pos[ids[j]];
@@ -190,13 +168,16 @@ function initTree() {
           const dx = b.x - a.x;
           const dist = Math.abs(dx);
           if (dist < MIN_SEP && dist > 0.1) {
-            const push = (MIN_SEP - dist) / 2 + 4;
+            const push = (MIN_SEP - dist) / 2 + 2;
             if (dx > 0) { a.x -= push; b.x += push; }
             else { a.x += push; b.x -= push; }
           }
         }
       }
     }
+
+    return pos;
+  }
 
     return pos;
   }
