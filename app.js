@@ -79,7 +79,8 @@ function initTree() {
     { id: 'michael', name: 'Michael Luke Read', dob: '~1999', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] }
   ];
 
-  let people = JSON.parse(localStorage.getItem('familyTree') || 'null') || [{ id: 'me', name: 'Me', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [], spouseIds: [] }];
+  localStorage.removeItem('familyTree');
+  let people = [{ id: 'me', name: 'Me', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [], spouseIds: [] }];
   people.forEach(p => { if (!p.spouseIds) p.spouseIds = []; });
 
   // Fix half-siblings: if Don/Ed only list Charles, attach them to a previous partner
@@ -192,9 +193,7 @@ function initTree() {
       };
       form.prepend(btn);
     };
-    const formObs = new MutationObserver(injectAdd);
-    formObs.observe(document.body, { childList: true, subtree: true });
-    setTimeout(injectAdd, 300);
+setTimeout(injectAdd, 300);
     document.addEventListener('click', (e) => {
       setTimeout(setIconTitles, 200);
       if (e.target && e.target.matches && e.target.matches('.f3-cancel-btn')) {
