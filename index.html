@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- build -->
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet">
-  <title>Read Family Tree v0.067</title>
+  <title>Read Family Tree v0.07</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/family-chart@latest/dist/styles/family-chart.css">
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
-<body data-theme="light">
+<body data-theme="dark">
   <div id="login-overlay">
     <div id="login-box">
       <h2>Read Family Tree</h2>
@@ -29,46 +29,12 @@
     <div id="header">
       <h1>Read Family Tree</h1>
       <span id="user-email"></span>
-      <div id="view-controls">
-        <span>View:</span>
-        <button id="view-both" class="view-btn active">Both</button>
-        <button id="view-paternal" class="view-btn">Paternal</button>
-        <button id="view-maternal" class="view-btn">Maternal</button>
-      </div>
       <button id="logout-btn">Sign out</button>
       <button id="theme-toggle">Toggle Theme</button>
       <button id="export-btn">Export JSON</button>
-      <button id="reset-btn">Reset to Seed</button>
     </div>
-    <svg id="chart"></svg>
-    <div id="context-menu"></div>
-    <div id="modal">
-      <div id="modal-content">
-        <h3 id="modal-title">Edit Person</h3>
-        <form id="person-form">
-          <label>Name (birth name) <input name="name" required></label>
-          <label>Married Surname <input name="marriedSurname" placeholder="if different from birth surname"></label>
-          <label>Date of Birth <input name="dob" placeholder="e.g. 1963-07 or July 1963"></label>
-          <label>Birth Location <input name="birthLoc"></label>
-          <label>Date of Death <input name="dod" placeholder="or blank if living"></label>
-          <label>Death Location <input name="deathLoc"></label>
-          <label>Death Reason <input name="deathReason"></label>
-          <label>Gender
-            <select name="gender">
-              <option value="">Unknown</option>
-              <option value="M">Male</option>
-              <option value="F">Female</option>
-              <option value="O">Other</option>
-            </select>
-          </label>
-          <div class="modal-buttons">
-            <button type="button" id="modal-cancel">Cancel</button>
-            <button type="submit">Save</button>
-          </div>
-        </form>
-      </div>
-    </div>
-    <div id="footer">v0.067 • Data stored locally in your browser</div>
+    <div id="chart" class="f3" style="width:100%;height:calc(100vh - 50px);margin:auto;"></div>
+    <div id="footer">v0.07 • Powered by family-chart</div>
   </div>
 
   <script type="module" src="app.js"></script>
