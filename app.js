@@ -210,6 +210,7 @@ function initTree() {
         people = fromF3(exported);
         localStorage.setItem('familyTree', JSON.stringify(people));
         console.log('saved', people.length);
+        f3Chart.updateTree({});
       }
     } catch (e) { console.warn('save skipped', e); }
   }
