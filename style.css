@@ -192,3 +192,9 @@ input, select, textarea {
   font-size: 0.85rem;
   opacity: 0.8;
 }
+
+/* hide family-chart built-in gender radios */
+.f3-form .f3-gender-toggle,
+.f3-form .gender-radio,
+.f3-form label:has(input[type="radio"]) { display: none !important; }
+
