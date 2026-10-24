@@ -193,6 +193,8 @@ input, select, textarea {
   opacity: 0.8;
 }
 
-.f3-form .gender-radio,
-.f3-form label:has(input[type="radio"]) { display: none !important; }
+
+
+/* hide undo/redo history controls */
+.f3-history-controls { display: none !important; }
 
