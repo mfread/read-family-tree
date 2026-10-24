@@ -208,3 +208,12 @@ input, select, textarea {
 }
 /* icon tooltips via title attribute we will set */
 
+
+/* error bar stops before edit panel */
+#js-error {
+  right: 0;
+}
+body:has(.f3-form) #js-error {
+  right: 340px;
+}
+
