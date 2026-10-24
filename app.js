@@ -99,9 +99,11 @@ function initTree() {
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const unitX = 260;
+    const unitX = 240;
     const genH = 280;
+    const coupleW = 110;
 
+    // Generation from parents
     const gen = {};
     function depth(id, seen = new Set()) {
       if (gen[id] != null) return gen[id];
@@ -122,63 +124,71 @@ function initTree() {
     function spouseOf(p) {
       return (p.spouseIds || []).map(s => getPerson(s.id)).find(Boolean) || null;
     }
-    function kidsOf(parentIds) {
+
+    // Place a couple: male left, female right, centered on centerX
+    function placeCouple(person, centerX, y) {
+      if (placed.has(person.id)) return centerX;
+      const sp = spouseOf(person);
+      // Only pull spouse if not yet placed
+      if (sp && !placed.has(sp.id)) {
+        const male = person.gender === 'M' ? person : (sp.gender === 'M' ? sp : person);
+        const female = male === person ? sp : person;
+        place(male.id, centerX - coupleW / 2, y);
+        place(female.id, centerX + coupleW / 2, y);
+      } else {
+        place(person.id, centerX, y);
+      }
+      return centerX;
+    }
+
+    // Get children of a specific parent set
+    function childrenOf(parentIds) {
       const key = parentIds.slice().sort().join('|');
       return people.filter(c => (c.parentIds || []).slice().sort().join('|') === key);
     }
 
-    // Place a person and pull a parent-less spouse next to them (male left)
-    function placeWithSpouse(p, x, y) {
-      if (placed.has(p.id)) return;
-      const sp = spouseOf(p);
-      const pullSpouse = sp && !placed.has(sp.id) && !(sp.parentIds || []).length;
-      if (pullSpouse) {
-        const male = p.gender === 'M' ? p : sp;
-        const female = male === p ? sp : p;
-        place(male.id, x - 55, y);
-        place(female.id, x + 55, y);
-      } else {
-        place(p.id, x, y);
-      }
-    }
+    // Layout: place person+spouse, then their children centered underneath
+    function layout(person, centerX, y) {
+      if (placed.has(person.id)) return;
+      placeCouple(person, centerX, y);
 
-    // Place roots, then recursively centre children under each couple
-    function layoutFrom(p, centerX, y) {
-      if (placed.has(p.id)) return;
-      placeWithSpouse(p, centerX, y);
-      const sp = spouseOf(p);
-      const pids = (sp && pos[sp.id] && Math.abs(pos[sp.id].y - y) < 10)
-        ? [p.id, sp.id] : [p.id];
-      const kids = kidsOf(pids).filter(k => !placed.has(k.id));
+      const sp = spouseOf(person);
+      const bothPlaced = sp && pos[sp.id] && Math.abs((pos[sp.id].y) - y) < 5;
+      const pids = bothPlaced ? [person.id, sp.id] : [person.id];
+      const kids = childrenOf(pids).filter(k => !placed.has(k.id));
       if (!kids.length) return;
-      kids.sort((a, b) => (a.parentIds || []).length - (b.parentIds || []).length);
+
       const total = (kids.length - 1) * unitX;
       const startX = centerX - total / 2;
-      kids.forEach((kid, i) => layoutFrom(kid, startX + i * unitX, y + genH));
+      kids.forEach((kid, i) => layout(kid, startX + i * unitX, y + genH));
     }
 
+    // Start from roots (no parents), spaced apart
     const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
     let cursor = 0;
     roots.forEach(r => {
       if (placed.has(r.id)) return;
-      layoutFrom(r, cursor, 0);
+      layout(r, cursor, 0);
       const xs = Object.values(pos).map(pp => pp.x);
-      cursor = (xs.length ? Math.max(...xs) : cursor) + unitX * 3;
+      cursor = Math.max(...xs, cursor) + unitX * 2.5;
     });
 
-    // Half-siblings (single parent) that weren't placed — put them left of the full group
+    // Half-siblings (one parent only) not yet placed — put left of their parent's children
     people.filter(p => !placed.has(p.id) && (p.parentIds || []).length === 1).forEach(p => {
       const parent = getPerson(p.parentIds[0]);
-      const px = parent && pos[parent.id] ? pos[parent.id].x : 0;
-      const py = parent && pos[parent.id] ? pos[parent.id].y + genH : genH;
-      placeWithSpouse(p, px - unitX * 2, py);
+      if (parent && pos[parent.id]) {
+        placeCouple(p, pos[parent.id].x - unitX * 1.8, pos[parent.id].y + genH);
+      } else {
+        place(p.id, cursor, genH);
+        cursor += unitX;
+      }
     });
 
     people.forEach(p => { if (!placed.has(p.id)) place(p.id, cursor, (gen[p.id] || 0) * genH); });
 
-    // Collision push
+    // Collision push so boxes never overlap
     const ids = Object.keys(pos);
-    for (let iter = 0; iter < 10; iter++) {
+    for (let iter = 0; iter < 14; iter++) {
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = pos[ids[i]], b = pos[ids[j]];
@@ -186,7 +196,7 @@ function initTree() {
           const dx = b.x - a.x;
           const dist = Math.abs(dx);
           if (dist < MIN_SEP && dist > 0.1) {
-            const push = (MIN_SEP - dist) / 2 + 6;
+            const push = (MIN_SEP - dist) / 2 + 8;
             if (dx > 0) { a.x -= push; b.x += push; }
             else { a.x += push; b.x -= push; }
           }
