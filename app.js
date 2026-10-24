@@ -179,9 +179,6 @@ function initTree() {
     return pos;
   }
 
-    return pos;
-  }
-
   function getLineage(id, mode) {
     if (!id) return new Set();
     const set = new Set();
