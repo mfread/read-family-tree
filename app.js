@@ -99,10 +99,10 @@ function initTree() {
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const unitX = 280;
-    const genH = 300;
+    const unitX = 320;
+    const genH = 340;
     const coupleW = 120;
-    const clusterGap = 360;
+    const clusterGap = 520;
 
     function place(id, x, y) {
       if (placed.has(id)) return;
@@ -318,7 +318,7 @@ function initTree() {
       const minKidY = Math.min(...kids.map(k => pos[k.id].y));
       // Bar sits in the gap between parents and children, offset per group so they don't stack
       const gap = Math.max(80, minKidY - fromY);
-      const barY = fromY + 70 + gi * 50;
+      const barY = fromY + 90 + gi * 90;
       const safeBarY = Math.min(barY, minKidY - HH - 20);
 
       // Vertical from linkage line down to bar
