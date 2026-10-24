@@ -5,12 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
   <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet">
-  <title>Read Family Tree v0.04</title>
+  <title>Read Family Tree v0.05</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body data-theme="light">
-  <!-- Login overlay -->
   <div id="login-overlay">
     <div id="login-box">
       <h2>Read Family Tree</h2>
@@ -29,6 +28,12 @@
     <div id="header">
       <h1>Read Family Tree</h1>
       <span id="user-email"></span>
+      <div id="view-controls">
+        <span>View:</span>
+        <button id="view-both" class="view-btn active">Both</button>
+        <button id="view-paternal" class="view-btn">Paternal</button>
+        <button id="view-maternal" class="view-btn">Maternal</button>
+      </div>
       <button id="logout-btn">Sign out</button>
       <button id="theme-toggle">Toggle Theme</button>
       <button id="export-btn">Export JSON</button>
@@ -61,7 +66,7 @@
         </form>
       </div>
     </div>
-    <div id="footer">v0.04 • Data stored locally in your browser</div>
+    <div id="footer">v0.05 • Data stored locally in your browser</div>
   </div>
 
   <script type="module" src="app.js"></script>
