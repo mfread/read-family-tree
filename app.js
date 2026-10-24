@@ -179,19 +179,29 @@ function initTree() {
       if (!form || form.querySelector('.custom-add')) return;
       const btn = document.createElement('button');
       btn.className = 'custom-add';
-      btn.textContent = '+ Add relative';
+      btn.textContent = '+ Add person';
       btn.style.cssText = 'margin:8px;padding:6px 12px;background:#2a6;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;';
       btn.onclick = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         const edit = f3Chart.editTree();
-        if (edit && edit.addRelative) edit.addRelative();
+        if (edit && edit.addRelative) {
+          const main = f3Chart.getMainDatum ? f3Chart.getMainDatum() : null;
+          edit.addRelative(main);
+        }
       };
       form.prepend(btn);
     };
     const formObs = new MutationObserver(injectAdd);
     formObs.observe(document.body, { childList: true, subtree: true });
     setTimeout(injectAdd, 300);
-    document.addEventListener('click', () => setTimeout(setIconTitles, 200));
+    document.addEventListener('click', (e) => {
+      setTimeout(setIconTitles, 200);
+      if (e.target && e.target.matches && e.target.matches('.f3-cancel-btn')) {
+        const edit = f3Chart.editTree();
+        if (edit && edit.closeForm) edit.closeForm();
+      }
+    });
 
     // Rename Submit -> Save and auto-close form after submit
     const observer = new MutationObserver(() => {
