@@ -100,7 +100,7 @@ function initTree() {
     const pos = {};
     const placed = new Set();
     const unitX = 200;
-    const genH = 200;
+    const genH = 220;
 
     // Generation = longest path from a root
     const gen = {};
@@ -122,11 +122,10 @@ function initTree() {
       placed.add(id);
     }
 
-    // Place generation by generation
+    // Place generation by generation — people with parents stay on their generation row
     const maxGen = Math.max(...Object.values(gen), 0);
     for (let g = 0; g <= maxGen; g++) {
       const members = people.filter(p => gen[p.id] === g && !placed.has(p.id));
-      // Group by parent set so siblings stay together
       const groups = {};
       members.forEach(p => {
         const key = (p.parentIds || []).slice().sort().join('|') || 'root';
@@ -136,31 +135,23 @@ function initTree() {
 
       let cursorX = 0;
       Object.values(groups).forEach(group => {
-        // Sort half-siblings left of full siblings
         group.sort((a, b) => (a.parentIds || []).length - (b.parentIds || []).length);
         const startX = cursorX;
         group.forEach((p, i) => {
           const x = startX + i * unitX;
           place(p.id, x, g * genH);
-          // Place spouse next to them if spouse is same generation or root
-          const spouses = (p.spouseIds || []).map(s => getPerson(s.id)).filter(Boolean);
-          spouses.forEach(sp => {
-            if (placed.has(sp.id)) return;
-            if (gen[sp.id] !== g && gen[sp.id] != null && gen[sp.id] !== 0) return;
-            const putRight = (p.gender === 'M') || (sp.gender === 'F');
-            place(sp.id, x + (putRight ? unitX * 0.9 : -unitX * 0.9), g * genH);
-          });
         });
-        cursorX = startX + group.length * unitX + unitX * 1.5;
+        cursorX = startX + group.length * unitX + unitX * 2;
       });
     }
 
-    // Any remaining
+    // Any remaining (people with no parents who weren't placed)
     people.forEach(p => {
       if (!placed.has(p.id)) place(p.id, 0, (gen[p.id] || 0) * genH);
     });
 
-    // Enforce parents/spouses side-by-side: male left, female right
+    // Place spouses side-by-side. The person with parents keeps their generation.
+    // A spouse without parents is moved to the partner's row. Male left, female right.
     const paired = new Set();
     people.forEach(p => {
       (p.spouseIds || []).forEach(s => {
@@ -170,11 +161,18 @@ function initTree() {
         if (paired.has(key)) return;
         paired.add(key);
 
+        // Prefer the generation of the one who has parents
+        const pHasParents = (p.parentIds || []).length > 0;
+        const oHasParents = (other.parentIds || []).length > 0;
+        let y;
+        if (pHasParents && !oHasParents) y = pos[p.id].y;
+        else if (oHasParents && !pHasParents) y = pos[other.id].y;
+        else y = Math.min(pos[p.id].y, pos[other.id].y);
+
         const male = (p.gender === 'M' && other.gender !== 'M') ? p :
                      (other.gender === 'M' && p.gender !== 'M') ? other : p;
         const female = male === p ? other : p;
         const midX = (pos[p.id].x + pos[other.id].x) / 2;
-        const y = Math.min(pos[p.id].y, pos[other.id].y);
         pos[male.id].x = midX - unitX * 0.45;
         pos[female.id].x = midX + unitX * 0.45;
         pos[male.id].y = y;
@@ -305,17 +303,19 @@ function initTree() {
       const kids = group.children.filter(k => pos[k.id]);
       if (!kids.length) return;
 
-      // Every child has two parents — drop always starts from the linkage line between them
+      // Every child has two parents
       if (parents.length < 2 || !pos[parents[0].id] || !pos[parents[1].id]) return;
+      // Drop starts from just below the parent boxes so the line is always below the parents
+      const parentBottom = Math.max(pos[parents[0].id].y, pos[parents[1].id].y) + HH + 6;
+      const fromY = parentBottom;
       const midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
-      const fromY = pos[parents[0].id].y; // centre of the parent linkage line
 
       const kidXs = kids.map(k => pos[k.id].x);
       const minKidY = Math.min(...kids.map(k => pos[k.id].y));
-      // Distinct bar per group — spaced so horizontals never share a y
-      const barY = fromY + 50 + gi * 22;
-      // Keep bar above the children
-      const safeBarY = Math.min(barY, minKidY - HH - 12);
+      // Evenly space bars between parent bottom and children
+      const available = Math.max(40, minKidY - fromY - HH - 20);
+      const barY = fromY + 30 + (gi * (available / Math.max(1, groups.length)));
+      const safeBarY = Math.min(barY, minKidY - HH - 16);
 
       // Vertical from parents to private bar
       childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: safeBarY, type: 'v' });
