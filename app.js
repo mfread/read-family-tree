@@ -94,13 +94,13 @@ function initTree() {
   function isAlive(p) { return !p.dod || !p.dod.trim(); }
 
   const HW = 70, HH = 28;
-  const MIN_SEP = 160;
+  const MIN_SEP = 200;
 
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const unitX = 200;
-    const genH = 220;
+    const unitX = 260;
+    const genH = 260;
 
     function place(id, x, y) {
       if (placed.has(id)) return;
@@ -150,7 +150,7 @@ function initTree() {
       layoutCouple(r, cursor, 0);
       // Advance cursor past this subtree
       const xs = Object.values(pos).map(p => p.x);
-      cursor = (xs.length ? Math.max(...xs) : cursor) + unitX * 3;
+      cursor = (xs.length ? Math.max(...xs) : cursor) + unitX * 5;
     });
 
     // Anything left
@@ -295,12 +295,12 @@ function initTree() {
       // Prefer a high bar when the children are far away so the long horizontal stays clear
       let barY;
       if (distToKids > 250) {
-        barY = fromY + 40 + gi * 18;
+        barY = fromY + 55 + gi * 32;
       } else {
-        const available = Math.max(40, minKidY - fromY - HH - 20);
-        barY = fromY + 36 + (gi * (available / Math.max(1, groups.length)));
+        const available = Math.max(60, minKidY - fromY - HH - 30);
+        barY = fromY + 50 + (gi * (available / Math.max(1, groups.length)));
       }
-      const safeBarY = Math.min(barY, minKidY - HH - 16);
+      const safeBarY = Math.min(barY, minKidY - HH - 24);
 
       // Vertical from parents to private bar
       childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: safeBarY, type: 'v' });
