@@ -217,3 +217,8 @@ body:has(.f3-form) #js-error {
   right: 340px;
 }
 
+
+/* hide edit-toggle icon (already in edit mode) */
+.f3-form .f3-edit-toggle,
+.f3-form button[title="Edit"] { display: none !important; }
+
