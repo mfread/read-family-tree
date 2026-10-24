@@ -37,24 +37,16 @@ function showLogin() {
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
-    if (ALLOWED_EMAILS.length === 0 || ALLOWED_EMAILS.includes(user.email)) {
-      showApp(user);
-    } else {
-      signOut(auth);
-      showError("This email is not authorised.");
-      showLogin();
-    }
-  } else {
-    showLogin();
-  }
+    if (ALLOWED_EMAILS.length === 0 || ALLOWED_EMAILS.includes(user.email)) showApp(user);
+    else { signOut(auth); showError("This email is not authorised."); showLogin(); }
+  } else showLogin();
 });
 
 document.getElementById("login-form").onsubmit = async (e) => {
   e.preventDefault();
   showError("");
-  try {
-    await signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("password").value);
-  } catch (err) { showError(err.message); }
+  try { await signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("password").value); }
+  catch (err) { showError(err.message); }
 };
 
 document.getElementById("signup-btn").onclick = async () => {
@@ -62,9 +54,8 @@ document.getElementById("signup-btn").onclick = async () => {
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
   if (!email || !password) { showError("Enter email and password first."); return; }
-  try {
-    await createUserWithEmailAndPassword(auth, email, password);
-  } catch (err) { showError(err.message); }
+  try { await createUserWithEmailAndPassword(auth, email, password); }
+  catch (err) { showError(err.message); }
 };
 
 document.getElementById("logout-btn").onclick = () => signOut(auth);
@@ -125,50 +116,123 @@ function initTree() {
   function render() {
     g.selectAll('*').remove();
     const root = buildHierarchy();
-    d3.tree().nodeSize([180, 140]).separation((a, b) => a.parent === b.parent ? 1 : 1.2)(root);
+    d3.tree().nodeSize([200, 160]).separation((a, b) => a.parent === b.parent ? 1.1 : 1.3)(root);
 
-    const nodes = root.descendants().filter(d => d.data.id !== '__root' && d.data.id !== '__empty');
-    const links = root.links().filter(l => l.source.data.id !== '__root');
+    let nodes = root.descendants().filter(d => d.data.id !== '__root' && d.data.id !== '__empty');
+    const pos = {};
+    nodes.forEach(n => { pos[n.data.id] = { x: n.x, y: n.y }; });
 
-    g.selectAll('.link').data(links).join('path').attr('class', 'link').attr('d', d3.linkVertical().x(d => d.x).y(d => d.y));
+    // Place spouses to the right of the primary node
+    const placed = new Set();
+    nodes.forEach(n => {
+      const spouses = n.data.spouseIds || [];
+      spouses.forEach(s => {
+        if (placed.has(s.id) || placed.has(n.data.id)) return;
+        const spNode = nodes.find(nn => nn.data.id === s.id);
+        if (!spNode) return;
+        // Put spouse immediately to the right
+        const offset = 170;
+        pos[s.id] = { x: pos[n.data.id].x + offset, y: pos[n.data.id].y };
+        placed.add(s.id);
+        placed.add(n.data.id);
+      });
+    });
 
-    const node = g.selectAll('.node').data(nodes).join('g')
+    // Draw marriage lines (dotted)
+    const marriageLines = [];
+    nodes.forEach(n => {
+      (n.data.spouseIds || []).forEach(s => {
+        if (pos[n.data.id] && pos[s.id] && n.data.id < s.id) { // avoid double
+          marriageLines.push({
+            x1: pos[n.data.id].x + 75,
+            y1: pos[n.data.id].y,
+            x2: pos[s.id].x - 75,
+            y2: pos[s.id].y,
+            married: s.married
+          });
+        }
+      });
+    });
+
+    g.selectAll('.marriage')
+      .data(marriageLines)
+      .join('line')
+      .attr('class', 'marriage')
+      .attr('x1', d => d.x1).attr('y1', d => d.y1)
+      .attr('x2', d => d.x2).attr('y2', d => d.y2)
+      .attr('stroke', 'var(--accent)')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', d => d.married ? '6,4' : '2,3');
+
+    // Child links from marriage midpoint (or single parent)
+    const childLinks = [];
+    people.forEach(child => {
+      if (!child.parentIds || child.parentIds.length === 0) return;
+      const parents = child.parentIds.map(id => getPerson(id)).filter(Boolean);
+      if (parents.length === 0) return;
+
+      let fromX, fromY;
+      if (parents.length >= 2) {
+        // Midpoint of marriage if they are spouses
+        const p1 = parents[0], p2 = parents[1];
+        const m1 = pos[p1.id], m2 = pos[p2.id];
+        if (m1 && m2) {
+          fromX = (m1.x + m2.x) / 2;
+          fromY = (m1.y + m2.y) / 2 + 30;
+        } else if (m1) {
+          fromX = m1.x; fromY = m1.y + 30;
+        } else return;
+      } else {
+        const m = pos[parents[0].id];
+        if (!m) return;
+        fromX = m.x; fromY = m.y + 30;
+      }
+
+      const c = pos[child.id];
+      if (!c) return;
+      childLinks.push({ x1: fromX, y1: fromY, x2: c.x, y2: c.y - 30 });
+    });
+
+    g.selectAll('.child-link')
+      .data(childLinks)
+      .join('path')
+      .attr('class', 'child-link')
+      .attr('fill', 'none')
+      .attr('stroke', 'var(--link)')
+      .attr('stroke-width', 1.5)
+      .attr('d', d => `M${d.x1},${d.y1} V${(d.y1 + d.y2) / 2} H${d.x2} V${d.y2}`);
+
+    // Nodes
+    const node = g.selectAll('.node')
+      .data(nodes)
+      .join('g')
       .attr('class', d => 'node' + (d.data.id === meId ? ' me' : ''))
-      .attr('transform', d => `translate(${d.x},${d.y})`)
+      .attr('transform', d => {
+        const p = pos[d.data.id];
+        return `translate(${p.x},${p.y})`;
+      })
       .on('contextmenu', (e, d) => { e.preventDefault(); showContextMenu(e, d.data.id); });
 
     node.append('rect').attr('x', -75).attr('y', -30).attr('width', 150).attr('height', 60);
 
-    node.append('text').attr('text-anchor', 'middle').attr('dy', '-0.2em')
+    node.append('text').attr('text-anchor', 'middle').attr('dy', '0.3em')
       .text(d => d.data.name || 'Unnamed').call(wrapText, 140);
 
-    node.append('text').attr('text-anchor', 'middle').attr('dy', '1.2em').attr('font-size', '10px').attr('fill', 'var(--link)')
-      .text(d => {
-        const spouses = (d.data.spouseIds || []).map(s => {
-          const sp = getPerson(s.id);
-          return sp ? (s.married ? '\u2764 ' : '') + sp.name.split(' ')[0] : '';
-        }).filter(Boolean);
-        return spouses.join(', ');
-      });
-
     setTimeout(() => {
-      if (meId) {
-        const meNode = nodes.find(n => n.data.id === meId);
-        if (meNode) {
-          const t = d3.zoomIdentity.translate(width / 2 - meNode.x * 1.4, height / 2 - meNode.y * 1.4).scale(1.4);
-          svg.transition().duration(600).call(zoom.transform, t);
-          return;
-        }
+      const xs = Object.values(pos).map(p => p.x);
+      const ys = Object.values(pos).map(p => p.y);
+      if (!xs.length) return;
+      const minX = Math.min(...xs) - 120, maxX = Math.max(...xs) + 120;
+      const minY = Math.min(...ys) - 60, maxY = Math.max(...ys) + 60;
+      const dx = maxX - minX, dy = maxY - minY;
+      const scale = Math.min(0.85, Math.min((width - 80) / dx, (height - 80) / dy));
+      let t;
+      if (meId && pos[meId]) {
+        t = d3.zoomIdentity.translate(width / 2 - pos[meId].x * 1.3, height / 2 - pos[meId].y * 1.3).scale(1.3);
+      } else {
+        t = d3.zoomIdentity.translate((width - dx * scale) / 2 - minX * scale, (height - dy * scale) / 2 - minY * scale + 40).scale(scale);
       }
-      if (nodes.length) {
-        const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
-        const minX = Math.min(...xs) - 100, maxX = Math.max(...xs) + 100;
-        const minY = Math.min(...ys) - 50, maxY = Math.max(...ys) + 50;
-        const dx = maxX - minX, dy = maxY - minY;
-        const scale = Math.min(0.9, Math.min((width - 100) / dx, (height - 100) / dy));
-        const t = d3.zoomIdentity.translate((width - dx * scale) / 2 - minX * scale, (height - dy * scale) / 2 - minY * scale + 40).scale(scale);
-        svg.transition().duration(600).call(zoom.transform, t);
-      }
+      svg.transition().duration(600).call(zoom.transform, t);
     }, 50);
   }
 
@@ -234,14 +298,12 @@ function initTree() {
     }
   });
 
-  // Separate simple link dialog that does not destroy the person form
   function openLinkModal(type, person) {
     const existing = people.filter(p => p.id !== person.id);
     const options = existing.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     const marriedHtml = type === 'spouse' ? `<label style="display:block;margin:8px 0;"><input type="checkbox" id="married-check" checked> Married</label>` : '';
 
     const overlay = document.createElement('div');
-    overlay.id = 'link-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = `
       <div style="background:var(--modal-bg);padding:24px;border-radius:10px;min-width:280px;">
@@ -278,8 +340,7 @@ function initTree() {
           if (!person.spouseIds.find(s => s.id === other.id)) person.spouseIds.push({ id: other.id, married });
           if (!other.spouseIds.find(s => s.id === person.id)) other.spouseIds.push({ id: person.id, married });
         }
-        save();
-        render();
+        save(); render();
       } else {
         if (type === 'child') openEditModal(null, 'Add Child', { parentIds: [person.id] });
         else if (type === 'parent') openEditModal(null, 'Add Parent', { asParentOf: person.id });
@@ -310,7 +371,6 @@ function initTree() {
     modal.classList.add('show');
   }
 
-  // Bind form once, and it always works because we never destroy the form
   document.getElementById('person-form').onsubmit = (e) => {
     e.preventDefault();
     const form = e.target;
@@ -354,8 +414,7 @@ function initTree() {
   document.getElementById('modal-cancel').onclick = () => modal.classList.remove('show');
 
   const themeToggle = document.getElementById('theme-toggle');
-  const savedTheme = localStorage.getItem('theme') || 'light';
-  document.body.dataset.theme = savedTheme;
+  document.body.dataset.theme = localStorage.getItem('theme') || 'light';
   themeToggle.onclick = () => {
     const next = document.body.dataset.theme === 'light' ? 'dark' : 'light';
     document.body.dataset.theme = next;
