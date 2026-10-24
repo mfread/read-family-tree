@@ -91,69 +91,56 @@ function initTree() {
   function getPerson(id) { return people.find(p => p.id === id); }
   function isAlive(p) { return !p.dod || !p.dod.trim(); }
 
-  // Simple generation layout that places couples together
+  // Node dimensions (half)
+  const HW = 70, HH = 28;
+
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const genY = {};
-    let nextY = 0;
-    const unitX = 200;
+    const unitX = 220;
 
-    // Find roots (no parents)
     const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
 
     function placePerson(p, x, y) {
       if (placed.has(p.id)) return;
       pos[p.id] = { x, y };
       placed.add(p.id);
-      genY[y] = Math.max(genY[y] || 0, x);
     }
 
     function layout(p, x, y) {
       if (placed.has(p.id)) return;
-      // Place this person
       placePerson(p, x, y);
 
-      // Place spouse to the right (or left if female and spouse is male)
       const spouses = (p.spouseIds || []).map(s => getPerson(s.id)).filter(Boolean);
       spouses.forEach(sp => {
         if (placed.has(sp.id)) return;
-        const maleLeft = (p.gender === 'M' && sp.gender === 'F') || (p.gender !== 'F' && sp.gender === 'F');
-        if (maleLeft || p.gender === 'M') {
-          placePerson(sp, x + unitX * 0.85, y);
+        const putMaleLeft = (p.gender === 'M' && sp.gender !== 'M') || (sp.gender === 'F' && p.gender !== 'F');
+        if (putMaleLeft || p.gender === 'M') {
+          placePerson(sp, x + unitX * 0.9, y);
         } else {
-          // shift self right and put male on left
-          pos[p.id].x = x + unitX * 0.85;
+          pos[p.id].x = x + unitX * 0.9;
           placePerson(sp, x, y);
         }
       });
 
-      // Children
       const children = people.filter(c => (c.parentIds || []).includes(p.id));
       if (children.length) {
-        const childY = y + 140;
+        const childY = y + 180;
         const startX = x - ((children.length - 1) * unitX) / 2;
         children.forEach((child, i) => {
-          if (!placed.has(child.id)) {
-            layout(child, startX + i * unitX, childY);
-          }
+          if (!placed.has(child.id)) layout(child, startX + i * unitX, childY);
         });
       }
     }
 
-    // Place roots
     let rootX = 0;
     roots.forEach(r => {
       if (!placed.has(r.id)) {
         layout(r, rootX, 0);
-        rootX += unitX * 2.5;
+        rootX += unitX * 3;
       }
     });
-
-    // Place anyone missed
-    people.forEach(p => {
-      if (!placed.has(p.id)) layout(p, rootX, 0);
-    });
+    people.forEach(p => { if (!placed.has(p.id)) layout(p, rootX, 0); });
 
     return pos;
   }
@@ -162,17 +149,19 @@ function initTree() {
     g.selectAll('*').remove();
     const pos = computePositions();
 
-    // Marriage lines
+    // Marriage lines — attach strictly outside the boxes
     const marriageLines = [];
     people.forEach(p => {
       (p.spouseIds || []).forEach(s => {
         if (!pos[p.id] || !pos[s.id] || p.id > s.id) return;
         const married = s.married !== false;
+        const left = pos[p.id].x < pos[s.id].x ? p.id : s.id;
+        const right = left === p.id ? s.id : p.id;
         marriageLines.push({
-          x1: Math.min(pos[p.id].x, pos[s.id].x) + 70,
-          y1: pos[p.id].y,
-          x2: Math.max(pos[p.id].x, pos[s.id].x) - 70,
-          y2: pos[s.id].y,
+          x1: pos[left].x + HW + 2,
+          y1: pos[left].y,
+          x2: pos[right].x - HW - 2,
+          y2: pos[right].y,
           married
         });
       });
@@ -204,7 +193,7 @@ function initTree() {
         if (tip) tip.remove();
       });
 
-    // Child links + sibling bars
+    // Child links + sibling bars — all attachment points outside boxes
     const childLinks = [];
     const siblingBars = [];
     const byParents = {};
@@ -223,25 +212,30 @@ function initTree() {
       let midX, fromY;
       if (parents.length >= 2 && pos[parents[0].id] && pos[parents[1].id]) {
         midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
-        fromY = Math.max(pos[parents[0].id].y, pos[parents[1].id].y) + 30;
+        fromY = Math.max(pos[parents[0].id].y, pos[parents[1].id].y) + HH + 4;
       } else if (parents[0] && pos[parents[0].id]) {
         midX = pos[parents[0].id].x;
-        fromY = pos[parents[0].id].y + 30;
+        fromY = pos[parents[0].id].y + HH + 4;
       } else return;
 
       const kidYs = kids.map(k => pos[k.id].y);
-      const barY = Math.min(...kidYs) - 40;
+      const barY = Math.min(...kidYs) - HH - 20;
 
-      // Vertical from couple to bar
+      // Vertical drop from couple (starts below boxes)
       childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: barY });
 
-      // Horizontal sibling bar
+      // Horizontal sibling bar (well above child boxes)
       const xs = kids.map(k => pos[k.id].x);
       siblingBars.push({ x1: Math.min(...xs), y1: barY, x2: Math.max(...xs), y2: barY });
 
-      // Verticals to each child
+      // Verticals down to top of each child box
       kids.forEach(k => {
-        childLinks.push({ x1: pos[k.id].x, y1: barY, x2: pos[k.id].x, y2: pos[k.id].y - 30 });
+        childLinks.push({
+          x1: pos[k.id].x,
+          y1: barY,
+          x2: pos[k.id].x,
+          y2: pos[k.id].y - HH - 2
+        });
       });
     });
 
@@ -269,7 +263,7 @@ function initTree() {
       .attr('transform', d => `translate(${pos[d.id].x},${pos[d.id].y})`)
       .on('contextmenu', (e, d) => { e.preventDefault(); showContextMenu(e, d.id); });
 
-    node.append('rect').attr('x', -70).attr('y', -28).attr('width', 140).attr('height', 56);
+    node.append('rect').attr('x', -HW).attr('y', -HH).attr('width', HW * 2).attr('height', HH * 2);
 
     node.append('text')
       .attr('text-anchor', 'middle')
@@ -283,13 +277,12 @@ function initTree() {
         if (given) text.append('tspan').attr('x', 0).attr('dy', '1.2em').text(surname.toUpperCase());
       });
 
-    // Zoom to fit or to Me
     setTimeout(() => {
       const xs = Object.values(pos).map(p => p.x);
       const ys = Object.values(pos).map(p => p.y);
       if (!xs.length) return;
-      const minX = Math.min(...xs) - 100, maxX = Math.max(...xs) + 100;
-      const minY = Math.min(...ys) - 50, maxY = Math.max(...ys) + 50;
+      const minX = Math.min(...xs) - 120, maxX = Math.max(...xs) + 120;
+      const minY = Math.min(...ys) - 60, maxY = Math.max(...ys) + 60;
       const dx = maxX - minX, dy = maxY - minY;
       const scale = Math.min(0.9, Math.min((width - 60) / dx, (height - 60) / dy));
       let t;
