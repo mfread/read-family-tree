@@ -153,12 +153,13 @@ function initTree() {
 
   let f3Chart;
   try {
-    f3Chart = f3.createChart('#chart', data, { main_id: meId });
+    const validMain = data.find(d => d.id === meId) ? meId : (data[0] && data[0].id);
+    f3Chart = f3.createChart('#chart', data, { main_id: validMain });
     const f3Card = f3Chart
       .setCardHtml()
       .setCardDisplay([["first name", "last name"], ["birthday"]]);
     f3Chart.editTree()
-      .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname", "gender"])
+      .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname", {id:"gender", label:"gender", type:"select", options:["M","F"]}])
       .setEditFirst(true)
       .setCardClickOpen(f3Card);
     f3Chart.updateTree({ initial: true });
@@ -195,5 +196,11 @@ function initTree() {
     a.href = URL.createObjectURL(blob);
     a.download = 'family-tree.json';
     a.click();
+  };
+  document.getElementById('reset-btn').onclick = () => {
+    if (confirm('Clear all local data and reload the seed tree?')) {
+      localStorage.removeItem('familyTree');
+      location.reload();
+    }
   };
 }
