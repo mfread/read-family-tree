@@ -117,10 +117,15 @@ function initTree() {
 
   const data = toF3(people);
   const meId = sessionStorage.getItem('meId') || 'mark';
+  const status = document.createElement('div');
+  status.id = 'chart-status';
+  status.style.cssText = 'position:fixed;bottom:30px;left:10px;background:#222;color:#0f0;padding:6px 10px;z-index:200;font-size:12px;';
+  status.textContent = 'Loading chart… (' + data.length + ' people)';
+  document.body.appendChild(status);
 
   let f3Chart;
   try {
-    f3Chart = f3.createChart('#chart', data);
+    f3Chart = f3.createChart('#chart', data, { main_id: meId });
     f3Chart
       .setCardHtml()
       .setCardDisplay([["first name", "last name"], ["birthday"]]);
@@ -128,8 +133,12 @@ function initTree() {
       .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname", "gender"])
       .setEditFirst(false);
     f3Chart.updateTree({ initial: true });
+    status.textContent = 'Chart ready (' + data.length + ')';
+    setTimeout(() => status.remove(), 3000);
   } catch (err) {
     console.error('family-chart error:', err);
+    status.textContent = 'Chart error: ' + err.message;
+    status.style.color = '#f66';
     document.getElementById('chart').innerHTML = '<p style="color:#f66;padding:20px;">Chart failed to load: ' + err.message + '</p>';
   }
 
