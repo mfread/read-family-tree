@@ -289,23 +289,23 @@ function initTree() {
 
       const kidXs = kids.map(k => pos[k.id].x);
       const kidYs = kids.map(k => pos[k.id].y);
-      const barY = Math.min(...kidYs) - HH - 18;
+      const minKidY = Math.min(...kidYs);
       const barLeft = Math.min(...kidXs);
       const barRight = Math.max(...kidXs);
 
-      // Vertical drop from parents to bar level
+      // Private bar for this parent group only — sits between parents and children
+      // and does not share the line used by other parent groups
+      const barY = fromY + Math.max(30, (minKidY - fromY) * 0.45);
+
+      // Vertical drop from parents to their private bar
       childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: barY });
 
-      // Horizontal connector from parents' midpoint to the sibling bar (handles distant placement)
-      const connectX = midX < barLeft ? barLeft : (midX > barRight ? barRight : midX);
-      if (Math.abs(midX - connectX) > 2) {
-        childLinks.push({ x1: midX, y1: barY, x2: connectX, y2: barY });
-      }
+      // Horizontal only across this group's children (or to the single child)
+      const hLeft = Math.min(midX, barLeft);
+      const hRight = Math.max(midX, barRight);
+      childLinks.push({ x1: hLeft, y1: barY, x2: hRight, y2: barY });
 
-      // Sibling bar
-      siblingBars.push({ x1: barLeft, y1: barY, x2: barRight, y2: barY });
-
-      // Drops to each child
+      // Drop from the private bar to each child of this group
       kids.forEach(k => {
         childLinks.push({ x1: pos[k.id].x, y1: barY, x2: pos[k.id].x, y2: pos[k.id].y - HH - 2 });
       });
