@@ -2,6 +2,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebas
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import * as f3 from "https://unpkg.com/family-chart@0.9.0/dist/family-chart.esm.js";
 
+window.onerror = (msg, src, line, col, err) => {
+  const s = document.createElement('div');
+  s.style.cssText = 'position:fixed;top:60px;left:10px;right:10px;background:#400;color:#f88;padding:8px;z-index:9999;font:12px monospace;';
+  s.textContent = 'JS error: ' + msg + ' @' + line;
+  document.body.appendChild(s);
+};
+
 const firebaseConfig = {
   apiKey: "AIzaSyDgvTQ9Zzhnaf_uIQGbtRuRHPuBaVvTWXE",
   authDomain: "read-family-tree.firebaseapp.com",
@@ -51,6 +58,12 @@ let treeInitialised = false;
 function initTree() {
   if (treeInitialised) return;
   treeInitialised = true;
+
+  const status = document.createElement('div');
+  status.id = 'chart-status';
+  status.style.cssText = 'position:fixed;bottom:30px;left:10px;background:#222;color:#0f0;padding:6px 10px;z-index:200;font-size:12px;';
+  status.textContent = 'initTree started';
+  document.body.appendChild(status);
 
   const SEED = [
     { id: 'charles', name: 'Charles Francis Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'COPD and asthma', gender: 'M', parentIds: [], spouseIds: [{ id: 'judy', married: true }] },
@@ -116,12 +129,8 @@ function initTree() {
   }
 
   const data = toF3(people);
+  status.textContent = 'Data ready (' + data.length + ')';
   const meId = sessionStorage.getItem('meId') || 'mark';
-  const status = document.createElement('div');
-  status.id = 'chart-status';
-  status.style.cssText = 'position:fixed;bottom:30px;left:10px;background:#222;color:#0f0;padding:6px 10px;z-index:200;font-size:12px;';
-  status.textContent = 'Loading chart… (' + data.length + ' people)';
-  document.body.appendChild(status);
 
   let f3Chart;
   try {
