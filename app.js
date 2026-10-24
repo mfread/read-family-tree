@@ -14,10 +14,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Optional: restrict to specific emails (add yours here)
 const ALLOWED_EMAILS = [
   "mfread@gmail.com",
-  // add more as needed
 ];
 
 const loginOverlay = document.getElementById("login-overlay");
@@ -33,7 +31,6 @@ function showApp(user) {
   loginOverlay.style.display = "none";
   appDiv.style.display = "block";
   userEmailSpan.textContent = user.email;
-  // Initialise tree only after login
   initTree();
 }
 
@@ -85,7 +82,6 @@ document.getElementById("signup-btn").onclick = async () => {
 
 document.getElementById("logout-btn").onclick = () => signOut(auth);
 
-// ---------- Tree code (only runs after login) ----------
 let treeInitialised = false;
 
 function initTree() {
@@ -93,19 +89,22 @@ function initTree() {
   treeInitialised = true;
 
   const SEED = [
-    { id: 'charles', name: 'Charles Francis Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'COPD and asthma', gender: 'M', parentIds: [] },
-    { id: 'judy', name: 'Judy Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'Dementia (onset)', gender: 'F', parentIds: [] },
-    { id: 'edward', name: 'Edward Read', dob: '~1931', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [] },
-    { id: 'mark', name: 'Mark Francis Read', dob: '1963-07', birthLoc: 'Australia', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles', 'judy'] },
-    { id: 'merna', name: 'Merna Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [] },
-    { id: 'donald', name: 'Donald Utton', dob: '', birthLoc: 'UK?', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles'] },
-    { id: 'vanessa', name: 'Vanessa', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: ['charles', 'judy'] },
-    { id: 'matthew', name: 'Matthew Read', dob: '~1993', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'] },
-    { id: 'mitchell', name: 'Mitchell Read', dob: '~1994', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'] },
-    { id: 'michael', name: 'Michael Read', dob: '~1999', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'] }
+    { id: 'charles', name: 'Charles Francis Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'COPD and asthma', gender: 'M', parentIds: [], spouseIds: [] },
+    { id: 'judy', name: 'Judy Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'Dementia (onset)', gender: 'F', parentIds: [], spouseIds: [] },
+    { id: 'edward', name: 'Edward Read', dob: '~1931', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [], spouseIds: [] },
+    { id: 'mark', name: 'Mark Francis Read', dob: '1963-07', birthLoc: 'Australia', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles', 'judy'], spouseIds: [{ id: 'merna', married: true }] },
+    { id: 'merna', name: 'Merna Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [], spouseIds: [{ id: 'mark', married: true }] },
+    { id: 'donald', name: 'Donald Utton', dob: '', birthLoc: 'UK?', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles'], spouseIds: [] },
+    { id: 'vanessa', name: 'Vanessa', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: ['charles', 'judy'], spouseIds: [] },
+    { id: 'matthew', name: 'Matthew Read', dob: '~1993', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] },
+    { id: 'mitchell', name: 'Mitchell Read', dob: '~1994', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] },
+    { id: 'michael', name: 'Michael Read', dob: '~1999', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] }
   ];
 
   let people = JSON.parse(localStorage.getItem('familyTree') || 'null') || SEED.map(p => ({...p}));
+  // Ensure spouseIds exists on loaded data
+  people.forEach(p => { if (!p.spouseIds) p.spouseIds = []; });
+
   let meId = sessionStorage.getItem('meId') || null;
 
   const svg = d3.select('#chart');
@@ -119,6 +118,10 @@ function initTree() {
 
   function save() {
     localStorage.setItem('familyTree', JSON.stringify(people));
+  }
+
+  function getPerson(id) {
+    return people.find(p => p.id === id);
   }
 
   function buildHierarchy() {
@@ -145,7 +148,7 @@ function initTree() {
   function render() {
     g.selectAll('*').remove();
     const root = buildHierarchy();
-    const treeLayout = d3.tree().nodeSize([180, 120]).separation((a, b) => a.parent === b.parent ? 1 : 1.2);
+    const treeLayout = d3.tree().nodeSize([180, 140]).separation((a, b) => a.parent === b.parent ? 1 : 1.2);
     treeLayout(root);
 
     const nodes = root.descendants().filter(d => d.data.id !== '__root' && d.data.id !== '__empty');
@@ -164,25 +167,39 @@ function initTree() {
       .attr('transform', d => `translate(${d.x},${d.y})`)
       .on('contextmenu', (e, d) => {
         e.preventDefault();
-        showContextMenu(e, d.data);
+        showContextMenu(e, d.data.id);
       });
 
     node.append('rect')
-      .attr('x', -70).attr('y', -25).attr('width', 140).attr('height', 50);
+      .attr('x', -75).attr('y', -30).attr('width', 150).attr('height', 60);
 
     node.append('text')
       .attr('text-anchor', 'middle')
-      .attr('dy', '0.3em')
+      .attr('dy', '-0.2em')
       .text(d => d.data.name || 'Unnamed')
-      .call(wrapText, 130);
+      .call(wrapText, 140);
+
+    // Show spouses under name
+    node.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dy', '1.2em')
+      .attr('font-size', '10px')
+      .attr('fill', 'var(--link)')
+      .text(d => {
+        const spouses = (d.data.spouseIds || []).map(s => {
+          const sp = getPerson(s.id);
+          return sp ? (s.married ? '❤ ' : '') + sp.name.split(' ')[0] : '';
+        }).filter(Boolean);
+        return spouses.length ? spouses.join(', ') : '';
+      });
 
     setTimeout(() => {
       if (meId) {
         const meNode = nodes.find(n => n.data.id === meId);
         if (meNode) {
           const t = d3.zoomIdentity
-            .translate(width / 2 - meNode.x * 1.5, height / 2 - meNode.y * 1.5)
-            .scale(1.5);
+            .translate(width / 2 - meNode.x * 1.4, height / 2 - meNode.y * 1.4)
+            .scale(1.4);
           svg.transition().duration(600).call(zoom.transform, t);
           return;
         }
@@ -222,16 +239,17 @@ function initTree() {
   }
 
   const menu = document.getElementById('context-menu');
-  let currentPerson = null;
+  let currentPersonId = null;
 
-  function showContextMenu(e, person) {
-    currentPerson = person;
+  function showContextMenu(e, personId) {
+    currentPersonId = personId;
     menu.innerHTML = `
       <div data-action="setme">Set as Me</div>
       <div data-action="edit">Edit Properties</div>
-      <div data-action="addchild">Add Child</div>
-      <div data-action="addparent">Add Parent</div>
+      <div data-action="addchild">Add / Link Child</div>
+      <div data-action="addparent">Add / Link Parent</div>
       <div data-action="addsibling">Add Sibling</div>
+      <div data-action="linkspouse">Link Spouse / Partner</div>
     `;
     menu.style.display = 'block';
     menu.style.left = e.pageX + 'px';
@@ -241,22 +259,87 @@ function initTree() {
   document.addEventListener('click', () => menu.style.display = 'none');
   menu.addEventListener('click', (e) => {
     const action = e.target.dataset.action;
-    if (!action || !currentPerson) return;
+    if (!action || !currentPersonId) return;
     menu.style.display = 'none';
+    const person = getPerson(currentPersonId);
+    if (!person) return;
+
     if (action === 'setme') {
-      meId = currentPerson.id;
+      meId = currentPersonId;
       sessionStorage.setItem('meId', meId);
       render();
     } else if (action === 'edit') {
-      openModal(currentPerson, 'Edit');
+      openModal(person, 'Edit');
     } else if (action === 'addchild') {
-      openModal(null, 'Add Child', { parentIds: [currentPerson.id] });
+      openLinkModal('child', person);
     } else if (action === 'addparent') {
-      openModal(null, 'Add Parent', { asParentOf: currentPerson.id });
+      openLinkModal('parent', person);
     } else if (action === 'addsibling') {
-      openModal(null, 'Add Sibling', { parentIds: currentPerson.parentIds || [] });
+      openModal(null, 'Add Sibling', { parentIds: person.parentIds || [] });
+    } else if (action === 'linkspouse') {
+      openLinkModal('spouse', person);
     }
   });
+
+  // Link existing or create new
+  function openLinkModal(type, person) {
+    const existing = people.filter(p => p.id !== person.id);
+    const options = existing.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    const marriedOption = type === 'spouse' ? `
+      <label><input type="checkbox" id="married-check" checked> Married</label>
+    ` : '';
+
+    const html = `
+      <h3>Link ${type} to ${person.name}</h3>
+      <p>Select existing person or create new:</p>
+      <select id="existing-select"><option value="">-- Create new --</option>${options}</select>
+      ${marriedOption}
+      <div style="margin-top:12px;">
+        <button type="button" id="link-cancel">Cancel</button>
+        <button type="button" id="link-ok">OK</button>
+      </div>
+    `;
+    const modalContent = document.getElementById('modal-content');
+    const original = modalContent.innerHTML;
+    modalContent.innerHTML = html;
+    document.getElementById('modal').classList.add('show');
+
+    document.getElementById('link-cancel').onclick = () => {
+      document.getElementById('modal').classList.remove('show');
+      modalContent.innerHTML = original;
+    };
+
+    document.getElementById('link-ok').onclick = () => {
+      const sel = document.getElementById('existing-select').value;
+      const married = document.getElementById('married-check') ? document.getElementById('married-check').checked : true;
+      document.getElementById('modal').classList.remove('show');
+      modalContent.innerHTML = original;
+
+      if (sel) {
+        // Link existing
+        const other = getPerson(sel);
+        if (type === 'child') {
+          other.parentIds = other.parentIds || [];
+          if (!other.parentIds.includes(person.id)) other.parentIds.push(person.id);
+        } else if (type === 'parent') {
+          person.parentIds = person.parentIds || [];
+          if (!person.parentIds.includes(other.id)) person.parentIds.push(other.id);
+        } else if (type === 'spouse') {
+          person.spouseIds = person.spouseIds || [];
+          other.spouseIds = other.spouseIds || [];
+          if (!person.spouseIds.find(s => s.id === other.id)) person.spouseIds.push({ id: other.id, married });
+          if (!other.spouseIds.find(s => s.id === person.id)) other.spouseIds.push({ id: person.id, married });
+        }
+        save();
+        render();
+      } else {
+        // Create new
+        if (type === 'child') openModal(null, 'Add Child', { parentIds: [person.id] });
+        else if (type === 'parent') openModal(null, 'Add Parent', { asParentOf: person.id });
+        else if (type === 'spouse') openModal(null, 'Add Spouse', { asSpouseOf: person.id, married });
+      }
+    };
+  }
 
   const modal = document.getElementById('modal');
   const form = document.getElementById('person-form');
@@ -293,16 +376,26 @@ function initTree() {
       gender: form.gender.value
     };
     if (editing) {
-      Object.assign(editing, data);
+      // Update by id so the source array is mutated
+      const real = getPerson(editing.id);
+      if (real) Object.assign(real, data);
     } else {
       const id = 'p' + Date.now();
-      const newP = { id, parentIds: extra.parentIds || [], ...data };
+      const newP = { id, parentIds: extra.parentIds || [], spouseIds: [], ...data };
       people.push(newP);
       if (extra.asParentOf) {
-        const child = people.find(p => p.id === extra.asParentOf);
+        const child = getPerson(extra.asParentOf);
         if (child) {
           child.parentIds = child.parentIds || [];
           if (!child.parentIds.includes(id)) child.parentIds.push(id);
+        }
+      }
+      if (extra.asSpouseOf) {
+        const other = getPerson(extra.asSpouseOf);
+        if (other) {
+          newP.spouseIds.push({ id: other.id, married: extra.married !== false });
+          other.spouseIds = other.spouseIds || [];
+          other.spouseIds.push({ id: newP.id, married: extra.married !== false });
         }
       }
     }
