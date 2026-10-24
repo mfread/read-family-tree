@@ -94,7 +94,7 @@ function initTree() {
   function isAlive(p) { return !p.dod || !p.dod.trim(); }
 
   const HW = 70, HH = 28;
-  const MIN_SEP = 160; // minimum center-to-center x distance
+  const MIN_SEP = 160;
 
   function computePositions() {
     const pos = {};
@@ -153,13 +153,12 @@ function initTree() {
     });
     people.forEach(p => { if (!placed.has(p.id)) layout(p, rootX, 0); });
 
-    // Collision resolution: push overlapping nodes apart (same generation / similar y)
     const ids = Object.keys(pos);
     for (let iter = 0; iter < 8; iter++) {
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = pos[ids[i]], b = pos[ids[j]];
-          if (Math.abs(a.y - b.y) > 40) continue; // different generation
+          if (Math.abs(a.y - b.y) > 40) continue;
           const dx = b.x - a.x;
           const dist = Math.abs(dx);
           if (dist < MIN_SEP && dist > 0.1) {
@@ -219,7 +218,6 @@ function initTree() {
     const pos = computePositions();
     const lineage = (viewMode !== 'both' && lineageId) ? getLineage(lineageId, viewMode) : null;
 
-    // Marriage lines
     const marriageLines = [];
     people.forEach(p => {
       (p.spouseIds || []).forEach(s => {
@@ -263,7 +261,6 @@ function initTree() {
         if (tip) tip.remove();
       });
 
-    // Child links
     const childLinks = [];
     const siblingBars = [];
     const byParents = {};
@@ -311,7 +308,6 @@ function initTree() {
       .attr('x2', d => d.x2).attr('y2', d => d.y2)
       .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
 
-    // Nodes
     const node = g.selectAll('.node')
       .data(people.filter(p => pos[p.id]))
       .join('g')
@@ -414,13 +410,32 @@ function initTree() {
 
   function openLinkModal(type, person) {
     const existing = people.filter(p => p.id !== person.id);
-    const options = existing.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+    // Find current relationship if any
+    let currentId = null;
+    let currentMarried = true;
+    if (type === 'spouse' && person.spouseIds && person.spouseIds.length) {
+      currentId = person.spouseIds[0].id;
+      currentMarried = person.spouseIds[0].married !== false;
+    } else if (type === 'parent' && person.parentIds && person.parentIds.length) {
+      currentId = person.parentIds[0];
+    } else if (type === 'child') {
+      const child = people.find(c => (c.parentIds || []).includes(person.id));
+      if (child) currentId = child.id;
+    }
+
+    const options = existing.map(p => {
+      const selected = p.id === currentId ? ' selected' : '';
+      return `<option value="${p.id}"${selected}>${p.name}</option>`;
+    }).join('');
+
     const marriedHtml = type === 'spouse' ? `
       <div style="margin:10px 0; display:flex; align-items:center; gap:10px;">
         <label for="married-check" style="margin:0; cursor:pointer;">Married</label>
-        <input type="checkbox" id="married-check" checked style="width:auto; margin:0;">
+        <input type="checkbox" id="married-check" ${currentMarried ? 'checked' : ''} style="width:auto; margin:0;">
       </div>
     ` : '';
+
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = `
@@ -436,12 +451,14 @@ function initTree() {
       </div>
     `;
     document.body.appendChild(overlay);
+
     overlay.querySelector('#link-cancel').onclick = () => overlay.remove();
     overlay.querySelector('#link-ok').onclick = () => {
       const sel = overlay.querySelector('#existing-select').value;
       const marriedEl = overlay.querySelector('#married-check');
       const married = marriedEl ? marriedEl.checked : true;
       overlay.remove();
+
       if (sel) {
         const other = getPerson(sel);
         if (type === 'child') {
@@ -453,8 +470,14 @@ function initTree() {
         } else if (type === 'spouse') {
           person.spouseIds = person.spouseIds || [];
           other.spouseIds = other.spouseIds || [];
-          if (!person.spouseIds.find(s => s.id === other.id)) person.spouseIds.push({ id: other.id, married });
-          if (!other.spouseIds.find(s => s.id === person.id)) other.spouseIds.push({ id: person.id, married });
+          // Update or add on both sides
+          const existingS = person.spouseIds.find(s => s.id === other.id);
+          if (existingS) existingS.married = married;
+          else person.spouseIds.push({ id: other.id, married });
+
+          const existingO = other.spouseIds.find(s => s.id === person.id);
+          if (existingO) existingO.married = married;
+          else other.spouseIds.push({ id: person.id, married });
         }
         save();
         render();
