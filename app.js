@@ -188,14 +188,14 @@ function initTree() {
     document.getElementById('chart').innerHTML = '<p style="color:#f66;padding:20px;">Chart failed to load: ' + err.message + '</p>';
   }
 
-  // Persist changes
-  const store = f3Chart.store;
-  if (store && store.setOnUpdate) {
-    store.setOnUpdate(() => {
+  // Persist changes using exportData (correct format)
+  const editInst = f3Chart.editTree();
+  if (editInst && editInst.setOnChange) {
+    editInst.setOnChange(() => {
       try {
-        const tree = store.getTree();
-        if (tree && Array.isArray(tree.data)) {
-          people = fromF3(tree.data);
+        const exported = editInst.exportData();
+        if (Array.isArray(exported)) {
+          people = fromF3(exported);
           localStorage.setItem('familyTree', JSON.stringify(people));
         }
       } catch (e) { console.warn('save skipped', e); }
