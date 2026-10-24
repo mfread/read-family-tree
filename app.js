@@ -163,6 +163,19 @@ function initTree() {
       .setEditFirst(true)
       .setCardClickOpen(f3Card);
     f3Chart.updateTree({ initial: true });
+    // Set titles on form icons
+    const setIconTitles = () => {
+      document.querySelectorAll('.f3-form button, .f3-form svg').forEach(el => {
+        if (!el.title) {
+          const cls = el.className || '';
+          if (cls.includes('add') || el.querySelector('[class*="add"]')) el.title = 'Add relative';
+          else if (cls.includes('edit') || el.querySelector('[class*="edit"]')) el.title = 'Edit';
+          else if (cls.includes('close') || el.textContent === '×') el.title = 'Close';
+        }
+      });
+    };
+    setTimeout(setIconTitles, 500);
+    document.addEventListener('click', () => setTimeout(setIconTitles, 200));
 
     // Rename Submit -> Save and auto-close form after submit
     const observer = new MutationObserver(() => {
@@ -188,19 +201,22 @@ function initTree() {
     document.getElementById('chart').innerHTML = '<p style="color:#f66;padding:20px;">Chart failed to load: ' + err.message + '</p>';
   }
 
-  // Persist changes using exportData (correct format)
-  const editInst = f3Chart.editTree();
-  if (editInst && editInst.setOnChange) {
-    editInst.setOnChange(() => {
-      try {
-        const exported = editInst.exportData();
-        if (Array.isArray(exported)) {
-          people = fromF3(exported);
-          localStorage.setItem('familyTree', JSON.stringify(people));
-        }
-      } catch (e) { console.warn('save skipped', e); }
-    });
+  // Persist changes - hook both editTree and store
+  function saveNow() {
+    try {
+      const edit = f3Chart.editTree();
+      const exported = edit && edit.exportData ? edit.exportData() : null;
+      if (Array.isArray(exported) && exported.length) {
+        people = fromF3(exported);
+        localStorage.setItem('familyTree', JSON.stringify(people));
+        console.log('saved', people.length);
+      }
+    } catch (e) { console.warn('save skipped', e); }
   }
+  const editInst = f3Chart.editTree();
+  if (editInst && editInst.setOnChange) editInst.setOnChange(saveNow);
+  const store = f3Chart.store;
+  if (store && store.setOnUpdate) store.setOnUpdate(saveNow);
 
   document.getElementById('theme-toggle').onclick = () => {
     const body = document.body;
