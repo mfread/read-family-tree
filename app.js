@@ -174,7 +174,21 @@ function initTree() {
         else if (s.includes('close') || el.textContent.trim() === '×') el.title = 'Close';
       });
     };
-    setTimeout(setIconTitles, 500);
+    setTimeout(() => {
+      setIconTitles();
+      const form = document.querySelector('.f3-form');
+      if (form && !form.querySelector('.custom-add')) {
+        const btn = document.createElement('button');
+        btn.className = 'custom-add';
+        btn.textContent = '+ Add relative';
+        btn.style.cssText = 'margin:8px;padding:6px 12px;background:#2a6;color:#fff;border:none;border-radius:4px;cursor:pointer;';
+        btn.onclick = () => {
+          const edit = f3Chart.editTree();
+          if (edit && edit.addRelative) edit.addRelative();
+        };
+        form.prepend(btn);
+      }
+    }, 500);
     document.addEventListener('click', () => setTimeout(setIconTitles, 200));
 
     // Rename Submit -> Save and auto-close form after submit
