@@ -16,7 +16,7 @@ const auth = getAuth(app);
 
 // Optional: restrict to specific emails (add yours here)
 const ALLOWED_EMAILS = [
-  // "mfread@gmail.com",
+  "mfread@gmail.com",
   // add more as needed
 ];
 
