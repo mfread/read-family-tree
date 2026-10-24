@@ -99,10 +99,9 @@ function initTree() {
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const unitX = 280;
-    const genH = 260;
+    const unitX = 260;
+    const genH = 280;
 
-    // Generation from parents only
     const gen = {};
     function depth(id, seen = new Set()) {
       if (gen[id] != null) return gen[id];
@@ -120,69 +119,66 @@ function initTree() {
       pos[id] = { x, y };
       placed.add(id);
     }
-
     function spouseOf(p) {
       return (p.spouseIds || []).map(s => getPerson(s.id)).find(Boolean) || null;
     }
-
-    // Place generation by generation. People with parents stay on their row.
-    // A spouse without parents is pulled onto this row.
-    const maxGen = Math.max(...Object.values(gen), 0);
-    for (let g = 0; g <= maxGen; g++) {
-      const members = people.filter(p => gen[p.id] === g && !placed.has(p.id));
-      // Group siblings
-      const groups = {};
-      members.forEach(p => {
-        const key = (p.parentIds || []).slice().sort().join('|') || ('root-' + p.id);
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(p);
-      });
-      let cursor = 0;
-      Object.values(groups).forEach(group => {
-        group.sort((a, b) => (a.parentIds || []).length - (b.parentIds || []).length);
-        group.forEach((p, i) => {
-          const x = cursor + i * unitX;
-          place(p.id, x, g * genH);
-          // Pull a parent-less spouse onto this row, male left / female right
-          const sp = spouseOf(p);
-          if (sp && !placed.has(sp.id) && !(sp.parentIds || []).length) {
-            const male = p.gender === 'M' ? p : sp;
-            const female = male === p ? sp : p;
-            // Shift so male is left
-            if (male === p) place(sp.id, x + 110, g * genH);
-            else { pos[p.id].x = x + 110; place(sp.id, x, g * genH); }
-          }
-        });
-        cursor += group.length * unitX + unitX * 2.5;
-      });
+    function kidsOf(parentIds) {
+      const key = parentIds.slice().sort().join('|');
+      return people.filter(c => (c.parentIds || []).slice().sort().join('|') === key);
     }
 
-    people.forEach(p => { if (!placed.has(p.id)) place(p.id, 0, (gen[p.id] || 0) * genH); });
-
-    // Ensure every couple is male-left, female-right, same y
-    const paired = new Set();
-    people.forEach(p => {
+    // Place a person and pull a parent-less spouse next to them (male left)
+    function placeWithSpouse(p, x, y) {
+      if (placed.has(p.id)) return;
       const sp = spouseOf(p);
-      if (!sp || !pos[p.id] || !pos[sp.id]) return;
-      const key = [p.id, sp.id].sort().join('|');
-      if (paired.has(key)) return;
-      paired.add(key);
-      // Keep the y of the one who has parents
-      const y = (p.parentIds || []).length ? pos[p.id].y :
-                (sp.parentIds || []).length ? pos[sp.id].y :
-                Math.min(pos[p.id].y, pos[sp.id].y);
-      const male = (p.gender === 'M') ? p : sp;
-      const female = male === p ? sp : p;
-      const mid = (pos[p.id].x + pos[sp.id].x) / 2;
-      pos[male.id].x = mid - 55;
-      pos[female.id].x = mid + 55;
-      pos[male.id].y = y;
-      pos[female.id].y = y;
+      const pullSpouse = sp && !placed.has(sp.id) && !(sp.parentIds || []).length;
+      if (pullSpouse) {
+        const male = p.gender === 'M' ? p : sp;
+        const female = male === p ? sp : p;
+        place(male.id, x - 55, y);
+        place(female.id, x + 55, y);
+      } else {
+        place(p.id, x, y);
+      }
+    }
+
+    // Place roots, then recursively centre children under each couple
+    function layoutFrom(p, centerX, y) {
+      if (placed.has(p.id)) return;
+      placeWithSpouse(p, centerX, y);
+      const sp = spouseOf(p);
+      const pids = (sp && pos[sp.id] && Math.abs(pos[sp.id].y - y) < 10)
+        ? [p.id, sp.id] : [p.id];
+      const kids = kidsOf(pids).filter(k => !placed.has(k.id));
+      if (!kids.length) return;
+      kids.sort((a, b) => (a.parentIds || []).length - (b.parentIds || []).length);
+      const total = (kids.length - 1) * unitX;
+      const startX = centerX - total / 2;
+      kids.forEach((kid, i) => layoutFrom(kid, startX + i * unitX, y + genH));
+    }
+
+    const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
+    let cursor = 0;
+    roots.forEach(r => {
+      if (placed.has(r.id)) return;
+      layoutFrom(r, cursor, 0);
+      const xs = Object.values(pos).map(pp => pp.x);
+      cursor = (xs.length ? Math.max(...xs) : cursor) + unitX * 3;
     });
+
+    // Half-siblings (single parent) that weren't placed — put them left of the full group
+    people.filter(p => !placed.has(p.id) && (p.parentIds || []).length === 1).forEach(p => {
+      const parent = getPerson(p.parentIds[0]);
+      const px = parent && pos[parent.id] ? pos[parent.id].x : 0;
+      const py = parent && pos[parent.id] ? pos[parent.id].y + genH : genH;
+      placeWithSpouse(p, px - unitX * 2, py);
+    });
+
+    people.forEach(p => { if (!placed.has(p.id)) place(p.id, cursor, (gen[p.id] || 0) * genH); });
 
     // Collision push
     const ids = Object.keys(pos);
-    for (let iter = 0; iter < 12; iter++) {
+    for (let iter = 0; iter < 10; iter++) {
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = pos[ids[i]], b = pos[ids[j]];
@@ -190,7 +186,7 @@ function initTree() {
           const dx = b.x - a.x;
           const dist = Math.abs(dx);
           if (dist < MIN_SEP && dist > 0.1) {
-            const push = (MIN_SEP - dist) / 2 + 8;
+            const push = (MIN_SEP - dist) / 2 + 6;
             if (dx > 0) { a.x -= push; b.x += push; }
             else { a.x += push; b.x -= push; }
           }
@@ -316,7 +312,7 @@ function initTree() {
       const minKidY = Math.min(...kids.map(k => pos[k.id].y));
       // Bar sits in the gap between parents and children, offset per group so they don't stack
       const gap = Math.max(80, minKidY - fromY);
-      const barY = fromY + 40 + gi * 28;
+      const barY = fromY + 55 + gi * 40;
       const safeBarY = Math.min(barY, minKidY - HH - 20);
 
       // Vertical from linkage line down to bar
