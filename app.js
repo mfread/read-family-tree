@@ -283,14 +283,10 @@ function initTree() {
       const kids = group.children.filter(k => pos[k.id]);
       if (!kids.length) return;
 
-      let midX, fromY;
-      if (parents.length >= 2 && pos[parents[0].id] && pos[parents[1].id]) {
-        midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
-        fromY = pos[parents[0].id].y;
-      } else if (parents[0] && pos[parents[0].id]) {
-        midX = pos[parents[0].id].x;
-        fromY = pos[parents[0].id].y + HH + 4;
-      } else return;
+      // Every child has two parents — drop always starts from the linkage line between them
+      if (parents.length < 2 || !pos[parents[0].id] || !pos[parents[1].id]) return;
+      const midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
+      const fromY = pos[parents[0].id].y; // centre of the parent linkage line
 
       const kidXs = kids.map(k => pos[k.id].x);
       const minKidY = Math.min(...kids.map(k => pos[k.id].y));
