@@ -94,12 +94,12 @@ function initTree() {
   function isAlive(p) { return !p.dod || !p.dod.trim(); }
 
   const HW = 70, HH = 28;
-  const MIN_SEP = 200;
+  const MIN_SEP = 240;
 
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const unitX = 240;
+    const unitX = 320;
     const genH = 280;
     const coupleW = 110;
 
@@ -170,7 +170,7 @@ function initTree() {
       if (placed.has(r.id)) return;
       layout(r, cursor, 0);
       const xs = Object.values(pos).map(pp => pp.x);
-      cursor = Math.max(...xs, cursor) + unitX * 2.5;
+      cursor = Math.max(...xs, cursor) + unitX * 4;
     });
 
     // Half-siblings (one parent only) not yet placed — put left of their parent's children
@@ -188,7 +188,7 @@ function initTree() {
 
     // Collision push so boxes never overlap
     const ids = Object.keys(pos);
-    for (let iter = 0; iter < 14; iter++) {
+    for (let iter = 0; iter < 24; iter++) {
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = pos[ids[i]], b = pos[ids[j]];
@@ -196,7 +196,7 @@ function initTree() {
           const dx = b.x - a.x;
           const dist = Math.abs(dx);
           if (dist < MIN_SEP && dist > 0.1) {
-            const push = (MIN_SEP - dist) / 2 + 8;
+            const push = (MIN_SEP - dist) / 2 + 16;
             if (dx > 0) { a.x -= push; b.x += push; }
             else { a.x += push; b.x -= push; }
           }
