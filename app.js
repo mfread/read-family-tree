@@ -13,7 +13,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-
 const ALLOWED_EMAILS = ["mfread@gmail.com"];
 
 const loginOverlay = document.getElementById("login-overlay");
@@ -22,14 +21,12 @@ const authError = document.getElementById("auth-error");
 const userEmailSpan = document.getElementById("user-email");
 
 function showError(msg) { authError.textContent = msg; }
-
 function showApp(user) {
   loginOverlay.style.display = "none";
   appDiv.style.display = "block";
   userEmailSpan.textContent = user.email;
   initTree();
 }
-
 function showLogin() {
   loginOverlay.style.display = "flex";
   appDiv.style.display = "none";
@@ -48,7 +45,6 @@ document.getElementById("login-form").onsubmit = async (e) => {
   try { await signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("password").value); }
   catch (err) { showError(err.message); }
 };
-
 document.getElementById("signup-btn").onclick = async () => {
   showError("");
   const email = document.getElementById("email").value;
@@ -57,7 +53,6 @@ document.getElementById("signup-btn").onclick = async () => {
   try { await createUserWithEmailAndPassword(auth, email, password); }
   catch (err) { showError(err.message); }
 };
-
 document.getElementById("logout-btn").onclick = () => signOut(auth);
 
 let treeInitialised = false;
@@ -67,16 +62,16 @@ function initTree() {
   treeInitialised = true;
 
   const SEED = [
-    { id: 'charles', name: 'Charles Francis Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'COPD and asthma', gender: 'M', parentIds: [], spouseIds: [] },
-    { id: 'judy', name: 'Judy Anne Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'Dementia (onset)', gender: 'F', parentIds: [], spouseIds: [] },
+    { id: 'charles', name: 'Charles Francis Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'COPD and asthma', gender: 'M', parentIds: [], spouseIds: [{ id: 'judy', married: true }] },
+    { id: 'judy', name: 'Judy Anne Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: 'Dementia (onset)', gender: 'F', parentIds: [], spouseIds: [{ id: 'charles', married: true }] },
     { id: 'edward', name: 'Edward Read', dob: '~1931', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [], spouseIds: [] },
     { id: 'mark', name: 'Mark Francis Read', dob: '1963-07', birthLoc: 'Australia', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles', 'judy'], spouseIds: [{ id: 'merna', married: true }] },
-    { id: 'merna', name: 'Merna Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [], spouseIds: [{ id: 'mark', married: true }] },
+    { id: 'merna', name: 'Merna Helena Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [], spouseIds: [{ id: 'mark', married: true }] },
     { id: 'donald', name: 'Donald Utton', dob: '', birthLoc: 'UK?', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['charles'], spouseIds: [] },
-    { id: 'vanessa', name: 'Vanessa', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: ['charles', 'judy'], spouseIds: [] },
-    { id: 'matthew', name: 'Matthew Read', dob: '~1993', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] },
-    { id: 'mitchell', name: 'Mitchell Read', dob: '~1994', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] },
-    { id: 'michael', name: 'Michael Read', dob: '~1999', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] }
+    { id: 'vanessa', name: 'Vanessa Anne Read', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: ['charles', 'judy'], spouseIds: [] },
+    { id: 'matthew', name: 'Matthew Mark Read', dob: '~1993', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] },
+    { id: 'mitchell', name: 'Mitchell John Read', dob: '~1994', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] },
+    { id: 'michael', name: 'Michael Luke Read', dob: '~1999', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: ['mark', 'merna'], spouseIds: [] }
   ];
 
   let people = JSON.parse(localStorage.getItem('familyTree') || 'null') || SEED.map(p => ({...p}));
@@ -89,180 +84,224 @@ function initTree() {
   const width = window.innerWidth;
   const height = window.innerHeight;
   svg.attr('viewBox', [0, 0, width, height]);
-
-  const zoom = d3.zoom().scaleExtent([0.2, 3]).on('zoom', (e) => g.attr('transform', e.transform));
+  const zoom = d3.zoom().scaleExtent([0.15, 3]).on('zoom', (e) => g.attr('transform', e.transform));
   svg.call(zoom);
 
   function save() { localStorage.setItem('familyTree', JSON.stringify(people)); }
   function getPerson(id) { return people.find(p => p.id === id); }
-  function isAlive(p) { return !p.dod || p.dod.trim() === ''; }
+  function isAlive(p) { return !p.dod || !p.dod.trim(); }
 
-  function buildHierarchy() {
-    const byId = Object.fromEntries(people.map(p => [p.id, {...p, children: []}]));
-    const roots = [];
-    people.forEach(p => {
-      const node = byId[p.id];
-      if (!p.parentIds || p.parentIds.length === 0) roots.push(node);
-      else {
-        const parent = byId[p.parentIds[0]];
-        if (parent) parent.children.push(node);
-        else roots.push(node);
+  // Simple generation layout that places couples together
+  function computePositions() {
+    const pos = {};
+    const placed = new Set();
+    const genY = {};
+    let nextY = 0;
+    const unitX = 200;
+
+    // Find roots (no parents)
+    const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
+
+    function placePerson(p, x, y) {
+      if (placed.has(p.id)) return;
+      pos[p.id] = { x, y };
+      placed.add(p.id);
+      genY[y] = Math.max(genY[y] || 0, x);
+    }
+
+    function layout(p, x, y) {
+      if (placed.has(p.id)) return;
+      // Place this person
+      placePerson(p, x, y);
+
+      // Place spouse to the right (or left if female and spouse is male)
+      const spouses = (p.spouseIds || []).map(s => getPerson(s.id)).filter(Boolean);
+      spouses.forEach(sp => {
+        if (placed.has(sp.id)) return;
+        const maleLeft = (p.gender === 'M' && sp.gender === 'F') || (p.gender !== 'F' && sp.gender === 'F');
+        if (maleLeft || p.gender === 'M') {
+          placePerson(sp, x + unitX * 0.85, y);
+        } else {
+          // shift self right and put male on left
+          pos[p.id].x = x + unitX * 0.85;
+          placePerson(sp, x, y);
+        }
+      });
+
+      // Children
+      const children = people.filter(c => (c.parentIds || []).includes(p.id));
+      if (children.length) {
+        const childY = y + 140;
+        const startX = x - ((children.length - 1) * unitX) / 2;
+        children.forEach((child, i) => {
+          if (!placed.has(child.id)) {
+            layout(child, startX + i * unitX, childY);
+          }
+        });
+      }
+    }
+
+    // Place roots
+    let rootX = 0;
+    roots.forEach(r => {
+      if (!placed.has(r.id)) {
+        layout(r, rootX, 0);
+        rootX += unitX * 2.5;
       }
     });
-    if (roots.length > 1) return d3.hierarchy({ id: '__root', name: '', children: roots });
-    if (roots.length === 1) return d3.hierarchy(roots[0]);
-    return d3.hierarchy({ id: '__empty', name: 'No data', children: [] });
+
+    // Place anyone missed
+    people.forEach(p => {
+      if (!placed.has(p.id)) layout(p, rootX, 0);
+    });
+
+    return pos;
   }
 
   function render() {
     g.selectAll('*').remove();
-    const root = buildHierarchy();
-    d3.tree().nodeSize([220, 170]).separation((a, b) => a.parent === b.parent ? 1.1 : 1.3)(root);
+    const pos = computePositions();
 
-    let nodes = root.descendants().filter(d => d.data.id !== '__root' && d.data.id !== '__empty');
-    const pos = {};
-    nodes.forEach(n => { pos[n.data.id] = { x: n.x, y: n.y }; });
-
-    // Place spouses: male left, female right
-    const placed = new Set();
-    nodes.forEach(n => {
-      (n.data.spouseIds || []).forEach(s => {
-        if (placed.has(s.id) || placed.has(n.data.id)) return;
-        const sp = getPerson(s.id);
-        if (!sp || !pos[s.id]) return;
-        const me = getPerson(n.data.id);
-        const male = (me.gender === 'M' || me.gender === 'male') ? me : (sp.gender === 'M' || sp.gender === 'male') ? sp : me;
-        const female = (male.id === me.id) ? sp : me;
-        const baseX = pos[male.id] ? pos[male.id].x : pos[n.data.id].x;
-        pos[male.id] = { x: baseX, y: pos[male.id]?.y || pos[n.data.id].y };
-        pos[female.id] = { x: baseX + 180, y: pos[male.id].y };
-        placed.add(male.id);
-        placed.add(female.id);
-      });
-    });
-
-    // Marriage / partnership lines
+    // Marriage lines
     const marriageLines = [];
-    nodes.forEach(n => {
-      (n.data.spouseIds || []).forEach(s => {
-        if (!pos[n.data.id] || !pos[s.id]) return;
-        if (n.data.id > s.id) return; // avoid double
+    people.forEach(p => {
+      (p.spouseIds || []).forEach(s => {
+        if (!pos[p.id] || !pos[s.id] || p.id > s.id) return;
         const married = s.married !== false;
         marriageLines.push({
-          x1: Math.min(pos[n.data.id].x, pos[s.id].x) + 75,
-          y1: pos[n.data.id].y,
-          x2: Math.max(pos[n.data.id].x, pos[s.id].x) - 75,
+          x1: Math.min(pos[p.id].x, pos[s.id].x) + 70,
+          y1: pos[p.id].y,
+          x2: Math.max(pos[p.id].x, pos[s.id].x) - 70,
           y2: pos[s.id].y,
           married
         });
       });
     });
 
-    const lines = g.selectAll('.marriage')
+    g.selectAll('.marriage')
       .data(marriageLines)
       .join('line')
       .attr('class', 'marriage')
       .attr('x1', d => d.x1).attr('y1', d => d.y1)
       .attr('x2', d => d.x2).attr('y2', d => d.y2)
       .attr('stroke', d => d.married ? 'var(--married)' : 'var(--unmarried)')
-      .attr('stroke-width', 3)
+      .attr('stroke-width', 2.5)
       .style('cursor', 'pointer')
-      .on('mouseenter', function(e, d) {
-        const tip = document.createElement('div');
-        tip.id = 'line-tip';
+      .on('mouseenter', (e, d) => {
+        let tip = document.getElementById('line-tip');
+        if (!tip) {
+          tip = document.createElement('div');
+          tip.id = 'line-tip';
+          tip.style.cssText = 'position:fixed;background:#333;color:#fff;padding:3px 7px;border-radius:4px;font-size:11px;pointer-events:none;z-index:600;';
+          document.body.appendChild(tip);
+        }
         tip.textContent = d.married ? 'married' : 'not married';
-        tip.style.cssText = 'position:fixed;background:#333;color:#fff;padding:4px 8px;border-radius:4px;font-size:12px;pointer-events:none;z-index:500;';
-        tip.style.left = (e.pageX + 10) + 'px';
-        tip.style.top = (e.pageY - 20) + 'px';
-        document.body.appendChild(tip);
+        tip.style.left = (e.pageX + 8) + 'px';
+        tip.style.top = (e.pageY - 22) + 'px';
       })
       .on('mouseleave', () => {
         const tip = document.getElementById('line-tip');
         if (tip) tip.remove();
       });
 
-    // Child links from couple midpoint
+    // Child links + sibling bars
     const childLinks = [];
+    const siblingBars = [];
+    const byParents = {};
     people.forEach(child => {
       if (!child.parentIds || !child.parentIds.length || !pos[child.id]) return;
-      const parents = child.parentIds.map(id => getPerson(id)).filter(Boolean);
-      if (!parents.length) return;
+      const key = child.parentIds.slice().sort().join('|');
+      if (!byParents[key]) byParents[key] = { parents: child.parentIds, children: [] };
+      byParents[key].children.push(child);
+    });
 
-      let fromX, fromY;
+    Object.values(byParents).forEach(group => {
+      const parents = group.parents.map(id => getPerson(id)).filter(Boolean);
+      const kids = group.children.filter(k => pos[k.id]);
+      if (!kids.length) return;
+
+      let midX, fromY;
       if (parents.length >= 2 && pos[parents[0].id] && pos[parents[1].id]) {
-        fromX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
-        fromY = pos[parents[0].id].y + 30;
-      } else if (pos[parents[0].id]) {
-        fromX = pos[parents[0].id].x;
+        midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
+        fromY = Math.max(pos[parents[0].id].y, pos[parents[1].id].y) + 30;
+      } else if (parents[0] && pos[parents[0].id]) {
+        midX = pos[parents[0].id].x;
         fromY = pos[parents[0].id].y + 30;
       } else return;
 
-      childLinks.push({
-        x1: fromX, y1: fromY,
-        x2: pos[child.id].x, y2: pos[child.id].y - 30
+      const kidYs = kids.map(k => pos[k.id].y);
+      const barY = Math.min(...kidYs) - 40;
+
+      // Vertical from couple to bar
+      childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: barY });
+
+      // Horizontal sibling bar
+      const xs = kids.map(k => pos[k.id].x);
+      siblingBars.push({ x1: Math.min(...xs), y1: barY, x2: Math.max(...xs), y2: barY });
+
+      // Verticals to each child
+      kids.forEach(k => {
+        childLinks.push({ x1: pos[k.id].x, y1: barY, x2: pos[k.id].x, y2: pos[k.id].y - 30 });
       });
     });
 
     g.selectAll('.child-link')
       .data(childLinks)
-      .join('path')
+      .join('line')
       .attr('class', 'child-link')
-      .attr('fill', 'none')
-      .attr('stroke', 'var(--link)')
-      .attr('stroke-width', 1.5)
-      .attr('d', d => `M${d.x1},${d.y1} V${(d.y1+d.y2)/2} H${d.x2} V${d.y2}`);
+      .attr('x1', d => d.x1).attr('y1', d => d.y1)
+      .attr('x2', d => d.x2).attr('y2', d => d.y2)
+      .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
+
+    g.selectAll('.sibling-bar')
+      .data(siblingBars)
+      .join('line')
+      .attr('class', 'sibling-bar')
+      .attr('x1', d => d.x1).attr('y1', d => d.y1)
+      .attr('x2', d => d.x2).attr('y2', d => d.y2)
+      .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
 
     // Nodes
     const node = g.selectAll('.node')
-      .data(nodes)
+      .data(people.filter(p => pos[p.id]))
       .join('g')
-      .attr('class', d => {
-        const alive = isAlive(d.data);
-        return 'node' + (d.data.id === meId ? ' me' : '') + (alive ? ' alive' : ' dead');
-      })
-      .attr('transform', d => `translate(${pos[d.data.id].x},${pos[d.data.id].y})`)
-      .on('contextmenu', (e, d) => { e.preventDefault(); showContextMenu(e, d.data.id); });
+      .attr('class', d => 'node' + (d.id === meId ? ' me' : '') + (isAlive(d) ? ' alive' : ' dead'))
+      .attr('transform', d => `translate(${pos[d.id].x},${pos[d.id].y})`)
+      .on('contextmenu', (e, d) => { e.preventDefault(); showContextMenu(e, d.id); });
 
-    node.append('rect').attr('x', -75).attr('y', -30).attr('width', 150).attr('height', 60);
+    node.append('rect').attr('x', -70).attr('y', -28).attr('width', 140).attr('height', 56);
 
-    node.append('text').attr('text-anchor', 'middle').attr('dy', '0.3em')
-      .text(d => d.data.name || 'Unnamed').call(wrapText, 140);
+    node.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dy', '0.35em')
+      .each(function(d) {
+        const text = d3.select(this);
+        const parts = (d.name || 'Unnamed').split(' ');
+        const surname = parts.pop();
+        const given = parts.join(' ');
+        text.append('tspan').attr('x', 0).attr('dy', given ? '-0.4em' : '0.3em').text(given || surname);
+        if (given) text.append('tspan').attr('x', 0).attr('dy', '1.2em').text(surname.toUpperCase());
+      });
 
+    // Zoom to fit or to Me
     setTimeout(() => {
       const xs = Object.values(pos).map(p => p.x);
       const ys = Object.values(pos).map(p => p.y);
       if (!xs.length) return;
-      const minX = Math.min(...xs)-120, maxX = Math.max(...xs)+120;
-      const minY = Math.min(...ys)-60, maxY = Math.max(...ys)+60;
-      const dx = maxX-minX, dy = maxY-minY;
-      const scale = Math.min(0.85, Math.min((width-80)/dx, (height-80)/dy));
+      const minX = Math.min(...xs) - 100, maxX = Math.max(...xs) + 100;
+      const minY = Math.min(...ys) - 50, maxY = Math.max(...ys) + 50;
+      const dx = maxX - minX, dy = maxY - minY;
+      const scale = Math.min(0.9, Math.min((width - 60) / dx, (height - 60) / dy));
       let t;
       if (meId && pos[meId]) {
-        t = d3.zoomIdentity.translate(width/2 - pos[meId].x*1.3, height/2 - pos[meId].y*1.3).scale(1.3);
+        t = d3.zoomIdentity.translate(width / 2 - pos[meId].x * 1.2, height / 2 - pos[meId].y * 1.2).scale(1.2);
       } else {
-        t = d3.zoomIdentity.translate((width-dx*scale)/2 - minX*scale, (height-dy*scale)/2 - minY*scale + 40).scale(scale);
+        t = d3.zoomIdentity
+          .translate((width - dx * scale) / 2 - minX * scale, (height - dy * scale) / 2 - minY * scale + 30)
+          .scale(scale);
       }
-      svg.transition().duration(600).call(zoom.transform, t);
-    }, 50);
-  }
-
-  function wrapText(text, width) {
-    text.each(function() {
-      const text = d3.select(this);
-      const words = text.text().split(/\s+/).reverse();
-      let word, line = [], lineNumber = 0, lineHeight = 1.1, y = text.attr('y') || 0, dy = parseFloat(text.attr('dy') || 0);
-      let tspan = text.text(null).append('tspan').attr('x', 0).attr('y', y).attr('dy', dy + 'em');
-      while (word = words.pop()) {
-        line.push(word);
-        tspan.text(line.join(' '));
-        if (tspan.node().getComputedTextLength() > width) {
-          line.pop();
-          tspan.text(line.join(' '));
-          line = [word];
-          tspan = text.append('tspan').attr('x', 0).attr('y', y).attr('dy', ++lineNumber * lineHeight + dy + 'em').text(word);
-        }
-      }
-    });
+      svg.transition().duration(500).call(zoom.transform, t);
+    }, 40);
   }
 
   const menu = document.getElementById('context-menu');
@@ -290,29 +329,21 @@ function initTree() {
     menu.style.display = 'none';
     const person = getPerson(currentPersonId);
     if (!person) return;
-
     if (action === 'setme') {
       meId = currentPersonId;
       sessionStorage.setItem('meId', meId);
       render();
-    } else if (action === 'edit') {
-      openEditModal(person);
-    } else if (action === 'addchild') {
-      openLinkModal('child', person);
-    } else if (action === 'addparent') {
-      openLinkModal('parent', person);
-    } else if (action === 'addsibling') {
-      openEditModal(null, 'Add Sibling', { parentIds: person.parentIds || [] });
-    } else if (action === 'linkspouse') {
-      openLinkModal('spouse', person);
-    }
+    } else if (action === 'edit') openEditModal(person);
+    else if (action === 'addchild') openLinkModal('child', person);
+    else if (action === 'addparent') openLinkModal('parent', person);
+    else if (action === 'addsibling') openEditModal(null, 'Add Sibling', { parentIds: person.parentIds || [] });
+    else if (action === 'linkspouse') openLinkModal('spouse', person);
   });
 
   function openLinkModal(type, person) {
     const existing = people.filter(p => p.id !== person.id);
     const options = existing.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     const marriedHtml = type === 'spouse' ? `<label style="display:block;margin:8px 0;"><input type="checkbox" id="married-check" checked> Married</label>` : '';
-
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML = `
@@ -328,14 +359,12 @@ function initTree() {
       </div>
     `;
     document.body.appendChild(overlay);
-
     overlay.querySelector('#link-cancel').onclick = () => overlay.remove();
     overlay.querySelector('#link-ok').onclick = () => {
       const sel = overlay.querySelector('#existing-select').value;
       const marriedEl = overlay.querySelector('#married-check');
       const married = marriedEl ? marriedEl.checked : true;
       overlay.remove();
-
       if (sel) {
         const other = getPerson(sel);
         if (type === 'child') {
