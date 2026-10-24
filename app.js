@@ -80,7 +80,7 @@ function initTree() {
   ];
 
   localStorage.removeItem('familyTree');
-  let people = [];
+  let people = [{ id: 'me', name: 'Me', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [], spouseIds: [] }];
   people.forEach(p => { if (!p.spouseIds) p.spouseIds = []; });
 
   // Fix half-siblings: if Don/Ed only list Charles, attach them to a previous partner
