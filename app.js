@@ -100,101 +100,79 @@ function initTree() {
     const pos = {};
     const placed = new Set();
     const unitX = 200;
+    const genH = 200;
 
-    const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
+    // Generation = longest path from a root
+    const gen = {};
+    function depth(id, seen = new Set()) {
+      if (gen[id] != null) return gen[id];
+      if (seen.has(id)) return 0;
+      seen.add(id);
+      const p = getPerson(id);
+      if (!p || !p.parentIds || !p.parentIds.length) { gen[id] = 0; return 0; }
+      const d = Math.max(...p.parentIds.map(pid => depth(pid, seen))) + 1;
+      gen[id] = d;
+      return d;
+    }
+    people.forEach(p => depth(p.id));
 
-    function placePerson(p, x, y) {
-      if (placed.has(p.id)) return;
-      pos[p.id] = { x, y };
-      placed.add(p.id);
+    function place(id, x, y) {
+      if (placed.has(id)) return;
+      pos[id] = { x, y };
+      placed.add(id);
     }
 
-    function layout(p, x, y) {
-      if (placed.has(p.id)) return;
-      placePerson(p, x, y);
-
-      const spouses = (p.spouseIds || []).map(s => getPerson(s.id)).filter(Boolean);
-      spouses.forEach(sp => {
-        if (placed.has(sp.id)) return;
-        const putMaleLeft = (p.gender === 'M' && sp.gender !== 'M') || (sp.gender === 'F' && p.gender !== 'F');
-        if (putMaleLeft || p.gender === 'M') {
-          placePerson(sp, x + unitX * 0.95, y);
-        } else {
-          pos[p.id].x = x + unitX * 0.95;
-          placePerson(sp, x, y);
-        }
+    // Place generation by generation
+    const maxGen = Math.max(...Object.values(gen), 0);
+    for (let g = 0; g <= maxGen; g++) {
+      const members = people.filter(p => gen[p.id] === g && !placed.has(p.id));
+      // Group by parent set so siblings stay together
+      const groups = {};
+      members.forEach(p => {
+        const key = (p.parentIds || []).slice().sort().join('|') || 'root';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(p);
       });
 
-      let children = people.filter(c => (c.parentIds || []).includes(p.id) && !placed.has(c.id));
-      children.sort((a, b) => {
-        const aHalf = (a.parentIds || []).length === 1;
-        const bHalf = (b.parentIds || []).length === 1;
-        if (aHalf && !bHalf) return -1;
-        if (!aHalf && bHalf) return 1;
-        return 0;
-      });
-
-      if (children.length) {
-        const childY = y + 180;
-        const totalWidth = (children.length - 1) * unitX;
-        const startX = x - totalWidth / 2;
-        children.forEach((child, i) => {
-          layout(child, startX + i * unitX, childY);
+      let cursorX = 0;
+      Object.values(groups).forEach(group => {
+        // Sort half-siblings left of full siblings
+        group.sort((a, b) => (a.parentIds || []).length - (b.parentIds || []).length);
+        const startX = cursorX;
+        group.forEach((p, i) => {
+          const x = startX + i * unitX;
+          place(p.id, x, g * genH);
+          // Place spouse next to them if spouse is same generation or root
+          const spouses = (p.spouseIds || []).map(s => getPerson(s.id)).filter(Boolean);
+          spouses.forEach(sp => {
+            if (placed.has(sp.id)) return;
+            if (gen[sp.id] !== g && gen[sp.id] != null && gen[sp.id] !== 0) return;
+            const putRight = (p.gender === 'M') || (sp.gender === 'F');
+            place(sp.id, x + (putRight ? unitX * 0.9 : -unitX * 0.9), g * genH);
+          });
         });
-      }
+        cursorX = startX + group.length * unitX + unitX * 1.5;
+      });
     }
 
-    let rootX = 0;
-    roots.forEach(r => {
-      if (!placed.has(r.id)) {
-        layout(r, rootX, 0);
-        rootX += unitX * 4;
-      }
-    });
-    people.forEach(p => { if (!placed.has(p.id)) layout(p, rootX, 0); });
-
-    // Place any child who ended up at the wrong generation under their parents, avoiding collisions
-    people.forEach(child => {
-      if (!child.parentIds || !child.parentIds.length || !pos[child.id]) return;
-      const parentPos = child.parentIds.map(id => pos[id]).filter(Boolean);
-      if (!parentPos.length) return;
-      const maxParentY = Math.max(...parentPos.map(p => p.y));
-      if (pos[child.id].y > maxParentY + 60) return; // already below
-
-      const midX = parentPos.reduce((s, p) => s + p.x, 0) / parentPos.length;
-      let targetY = maxParentY + 180;
-      let targetX = midX;
-
-      // Nudge sideways until no collision with existing nodes at that generation
-      for (let attempt = 0; attempt < 12; attempt++) {
-        const conflict = Object.entries(pos).some(([id, p]) => {
-          if (id === child.id) return false;
-          return Math.abs(p.y - targetY) < 50 && Math.abs(p.x - targetX) < MIN_SEP;
-        });
-        if (!conflict) break;
-        targetX = midX + (attempt % 2 === 0 ? 1 : -1) * Math.ceil(attempt / 2) * MIN_SEP;
-      }
-      pos[child.id].x = targetX;
-      pos[child.id].y = targetY;
+    // Any remaining (spouses of different gens etc.)
+    people.forEach(p => {
+      if (!placed.has(p.id)) place(p.id, 0, (gen[p.id] || 0) * genH);
     });
 
+    // Collision push on same generation
     const ids = Object.keys(pos);
-    for (let iter = 0; iter < 8; iter++) {
+    for (let iter = 0; iter < 10; iter++) {
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = pos[ids[i]], b = pos[ids[j]];
-          if (Math.abs(a.y - b.y) > 40) continue;
+          if (Math.abs(a.y - b.y) > 30) continue;
           const dx = b.x - a.x;
           const dist = Math.abs(dx);
           if (dist < MIN_SEP && dist > 0.1) {
-            const push = (MIN_SEP - dist) / 2 + 2;
-            if (dx > 0) {
-              a.x -= push;
-              b.x += push;
-            } else {
-              a.x += push;
-              b.x -= push;
-            }
+            const push = (MIN_SEP - dist) / 2 + 4;
+            if (dx > 0) { a.x -= push; b.x += push; }
+            else { a.x += push; b.x -= push; }
           }
         }
       }
@@ -298,7 +276,9 @@ function initTree() {
       byParents[key].children.push(child);
     });
 
-    Object.values(byParents).forEach(group => {
+    // Assign a unique bar height to each parent group so trees stay separate
+    const groups = Object.values(byParents);
+    groups.forEach((group, gi) => {
       const parents = group.parents.map(id => getPerson(id)).filter(Boolean);
       const kids = group.children.filter(k => pos[k.id]);
       if (!kids.length) return;
@@ -306,48 +286,73 @@ function initTree() {
       let midX, fromY;
       if (parents.length >= 2 && pos[parents[0].id] && pos[parents[1].id]) {
         midX = (pos[parents[0].id].x + pos[parents[1].id].x) / 2;
-        fromY = pos[parents[0].id].y; // from marriage line
+        fromY = pos[parents[0].id].y;
       } else if (parents[0] && pos[parents[0].id]) {
         midX = pos[parents[0].id].x;
         fromY = pos[parents[0].id].y + HH + 4;
       } else return;
 
       const kidXs = kids.map(k => pos[k.id].x);
-      const kidYs = kids.map(k => pos[k.id].y);
-      const minKidY = Math.min(...kidYs);
-      const barLeft = Math.min(...kidXs);
-      const barRight = Math.max(...kidXs);
+      const minKidY = Math.min(...kids.map(k => pos[k.id].y));
+      // Distinct bar per group — spaced so horizontals never share a y
+      const barY = fromY + 50 + gi * 22;
+      // Keep bar above the children
+      const safeBarY = Math.min(barY, minKidY - HH - 12);
 
-      // Private bar — offset by a small amount so different parent groups don't share a line
-      const groupIndex = Object.keys(byParents).indexOf(group.parents.slice().sort().join('|'));
-      const gap = minKidY - fromY;
-      const barY = fromY + Math.max(36, gap * 0.5) + (groupIndex % 3) * 14;
+      // Vertical from parents to private bar
+      childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: safeBarY, type: 'v' });
 
-      // Vertical drop from the marriage line (or single parent) to the private bar
-      childLinks.push({ x1: midX, y1: fromY, x2: midX, y2: barY });
+      // Horizontal only across this group's children
+      const hLeft = Math.min(midX, ...kidXs);
+      const hRight = Math.max(midX, ...kidXs);
+      childLinks.push({ x1: hLeft, y1: safeBarY, x2: hRight, y2: safeBarY, type: 'h' });
 
-      // Horizontal only for this group's children
-      const hLeft = Math.min(midX, barLeft);
-      const hRight = Math.max(midX, barRight);
-      childLinks.push({ x1: hLeft, y1: barY, x2: hRight, y2: barY });
-
-      // Drop from the private bar to each child
+      // Drop to each child
       kids.forEach(k => {
-        childLinks.push({ x1: pos[k.id].x, y1: barY, x2: pos[k.id].x, y2: pos[k.id].y - HH - 2 });
+        childLinks.push({ x1: pos[k.id].x, y1: safeBarY, x2: pos[k.id].x, y2: pos[k.id].y - HH - 2, type: 'v' });
       });
     });
 
-    g.selectAll('.child-link').data(childLinks).join('line')
-      .attr('class', 'child-link')
-      .attr('x1', d => d.x1).attr('y1', d => d.y1)
-      .attr('x2', d => d.x2).attr('y2', d => d.y2)
-      .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
+    // Draw lines; where a horizontal crosses a vertical of another group, insert a bridge
+    const verticals = childLinks.filter(l => l.type === 'v');
+    childLinks.forEach(link => {
+      if (link.type !== 'h') {
+        g.append('line')
+          .attr('class', 'child-link')
+          .attr('x1', link.x1).attr('y1', link.y1)
+          .attr('x2', link.x2).attr('y2', link.y2)
+          .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
+        return;
+      }
+      // Find crossings
+      const crossings = verticals
+        .filter(v => v.x1 > Math.min(link.x1, link.x2) + 4 && v.x1 < Math.max(link.x1, link.x2) - 4
+                  && link.y1 > Math.min(v.y1, v.y2) && link.y1 < Math.max(v.y1, v.y2))
+        .map(v => v.x1)
+        .sort((a, b) => a - b);
 
-    g.selectAll('.sibling-bar').data(siblingBars).join('line')
-      .attr('class', 'sibling-bar')
-      .attr('x1', d => d.x1).attr('y1', d => d.y1)
-      .attr('x2', d => d.x2).attr('y2', d => d.y2)
-      .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
+      let x = Math.min(link.x1, link.x2);
+      const end = Math.max(link.x1, link.x2);
+      crossings.forEach(cx => {
+        if (cx - 8 > x) {
+          g.append('line').attr('class', 'child-link')
+            .attr('x1', x).attr('y1', link.y1).attr('x2', cx - 8).attr('y2', link.y1)
+            .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
+        }
+        // Bridge semicircle over the crossing
+        const bridge = d3.path();
+        bridge.moveTo(cx - 8, link.y1);
+        bridge.arc(cx, link.y1, 8, Math.PI, 0, true);
+        g.append('path').attr('d', bridge.toString())
+          .attr('fill', 'none').attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
+        x = cx + 8;
+      });
+      if (x < end) {
+        g.append('line').attr('class', 'child-link')
+          .attr('x1', x).attr('y1', link.y1).attr('x2', end).attr('y2', link.y1)
+          .attr('stroke', 'var(--link)').attr('stroke-width', 1.5);
+      }
+    });
 
     const node = g.selectAll('.node')
       .data(people.filter(p => pos[p.id]))
