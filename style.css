@@ -242,3 +242,7 @@ body:has(.f3-form) #js-error {
   font-weight: 500 !important;
 }
 
+
+/* hide close X - Cancel button exists */
+.f3-close-btn { display: none !important; }
+
