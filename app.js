@@ -99,112 +99,96 @@ function initTree() {
   function computePositions() {
     const pos = {};
     const placed = new Set();
-    const unitX = 300;
-    const genH = 320;
-    const coupleW = 130;
+    const unitX = 280;
+    const genH = 300;
+    const coupleW = 140;
+    const gap = 120;
 
-    function place(id, x, y) {
-      pos[id] = { x, y };
-      placed.add(id);
-    }
-    function spouseOf(p) {
-      return (p.spouseIds || []).map(s => getPerson(s.id)).find(Boolean) || null;
-    }
-    function childrenOf(parentIds) {
-      const key = parentIds.slice().sort().join('|');
+    function place(id, x, y) { pos[id] = { x, y }; placed.add(id); }
+    function spouseOf(p) { return (p.spouseIds || []).map(s => getPerson(s.id)).find(Boolean) || null; }
+    function kidsOf(ids) {
+      const key = ids.slice().sort().join('|');
       return people.filter(c => (c.parentIds || []).slice().sort().join('|') === key);
     }
 
-    // Place a couple as a tight unit. Always keep them side by side.
-    function placeCouple(person, centerX, y) {
-      const sp = spouseOf(person);
-      const male = (!sp || person.gender === 'M') ? person : sp;
-      const female = sp ? (male === person ? sp : person) : null;
-      place(male.id, centerX - (female ? coupleW / 2 : 0), y);
-      if (female) place(female.id, centerX + coupleW / 2, y);
+    function placeCouple(p, cx, y) {
+      const sp = spouseOf(p);
+      const male = (!sp || p.gender === 'M') ? p : sp;
+      const female = sp ? (male === p ? sp : p) : null;
+      place(male.id, cx - (female ? coupleW / 2 : 0), y);
+      if (female) place(female.id, cx + coupleW / 2, y);
     }
 
-    // Width of a subtree
-    function subtreeWidth(person, seen = new Set()) {
-      if (!person || seen.has(person.id)) return unitX;
-      seen.add(person.id);
-      const sp = spouseOf(person);
-      const pids = sp ? [person.id, sp.id] : [person.id];
-      const kids = childrenOf(pids);
-      if (!kids.length) return coupleW + 60;
-      const w = kids.reduce((sum, k) => sum + subtreeWidth(k, seen), 0) + (kids.length - 1) * 80;
-      return Math.max(coupleW + 60, w);
+    function widthOf(p, seen = new Set()) {
+      if (!p || seen.has(p.id)) return unitX;
+      seen.add(p.id);
+      const sp = spouseOf(p);
+      const ids = sp ? [p.id, sp.id] : [p.id];
+      const kids = kidsOf(ids);
+      if (!kids.length) return coupleW + 40;
+      return Math.max(coupleW + 40, kids.reduce((s, k) => s + widthOf(k, new Set(seen)), 0) + (kids.length - 1) * gap);
     }
 
-    function layout(person, centerX, y, seen = new Set()) {
-      if (seen.has(person.id)) return;
-      seen.add(person.id);
-      placeCouple(person, centerX, y);
-      const sp = spouseOf(person);
+    function layout(p, cx, y, seen = new Set()) {
+      if (seen.has(p.id)) return;
+      seen.add(p.id);
+      placeCouple(p, cx, y);
+      const sp = spouseOf(p);
       if (sp) seen.add(sp.id);
-      const pids = sp ? [person.id, sp.id] : [person.id];
-      const kids = childrenOf(pids);
+      const ids = sp ? [p.id, sp.id] : [p.id];
+      const kids = kidsOf(ids);
       if (!kids.length) return;
-      const widths = kids.map(k => subtreeWidth(k));
-      const total = widths.reduce((a, b) => a + b, 0) + (kids.length - 1) * 100;
-      let x = centerX - total / 2;
-      kids.forEach((kid, i) => {
-        layout(kid, x + widths[i] / 2, y + genH, seen);
-        x += widths[i] + 100;
+      const ws = kids.map(k => widthOf(k));
+      const total = ws.reduce((a, b) => a + b, 0) + (kids.length - 1) * gap;
+      let x = cx - total / 2;
+      kids.forEach((k, i) => {
+        layout(k, x + ws[i] / 2, y + genH, seen);
+        x += ws[i] + gap;
       });
     }
 
-    // Place root couples, spaced by subtree width
-    const roots = people.filter(p => !p.parentIds || p.parentIds.length === 0);
+    // Roots
+    const roots = people.filter(p => !p.parentIds || !p.parentIds.length);
     let cursor = 0;
     const seen = new Set();
     roots.forEach(r => {
       if (seen.has(r.id)) return;
-      const w = subtreeWidth(r);
+      const w = widthOf(r);
       layout(r, cursor + w / 2, 0, seen);
-      cursor += w + 400;
+      cursor += w + gap * 3;
     });
 
-    // Half-siblings (single parent) not yet placed — left of the full group
+    // Half-siblings left of full group
     people.filter(p => !placed.has(p.id) && (p.parentIds || []).length === 1).forEach((p, i) => {
-      const parent = getPerson(p.parentIds[0]);
-      if (parent && pos[parent.id]) {
-        placeCouple(p, pos[parent.id].x - unitX * (2.2 + i * 0.8), pos[parent.id].y + genH);
-      } else {
-        place(p.id, cursor, genH);
-        cursor += unitX;
-      }
+      const par = getPerson(p.parentIds[0]);
+      if (par && pos[par.id]) placeCouple(p, pos[par.id].x - unitX * (2 + i), pos[par.id].y + genH);
+      else { place(p.id, cursor, genH); cursor += unitX; }
     });
-
     people.forEach(p => { if (!placed.has(p.id)) place(p.id, cursor, 0); });
 
-    // Final: ensure every couple is still side by side (male left)
+    // Re-seat every couple side by side
     people.forEach(p => {
       const sp = spouseOf(p);
       if (!sp || !pos[p.id] || !pos[sp.id] || p.id > sp.id) return;
-      const y = (p.parentIds || []).length >= (sp.parentIds || []).length ? pos[p.id].y : pos[sp.id].y;
+      const y = (p.parentIds || []).length ? pos[p.id].y : pos[sp.id].y;
       const mid = (pos[p.id].x + pos[sp.id].x) / 2;
       const male = p.gender === 'M' ? p : sp;
       const female = male === p ? sp : p;
-      pos[male.id].x = mid - coupleW / 2;
-      pos[female.id].x = mid + coupleW / 2;
-      pos[male.id].y = y;
-      pos[female.id].y = y;
+      pos[male.id] = { x: mid - coupleW / 2, y };
+      pos[female.id] = { x: mid + coupleW / 2, y };
     });
 
-    // Push overlapping nodes apart (but keep couples together by pushing both)
+    // Push apart anything still overlapping on the same row
     const ids = Object.keys(pos);
-    for (let iter = 0; iter < 16; iter++) {
+    for (let n = 0; n < 20; n++) {
       for (let i = 0; i < ids.length; i++) {
         for (let j = i + 1; j < ids.length; j++) {
           const a = pos[ids[i]], b = pos[ids[j]];
-          if (Math.abs(a.y - b.y) > 30) continue;
-          const dx = b.x - a.x;
-          const dist = Math.abs(dx);
-          if (dist < MIN_SEP && dist > 0.1) {
-            const push = (MIN_SEP - dist) / 2 + 10;
-            if (dx > 0) { a.x -= push; b.x += push; }
-            else { a.x += push; b.x -= push; }
+          if (Math.abs(a.y - b.y) > 20) continue;
+          const dx = b.x - a.x, d = Math.abs(dx);
+          if (d < MIN_SEP && d > 0.1) {
+            const push = (MIN_SEP - d) / 2 + 8;
+            if (dx > 0) { a.x -= push; b.x += push; } else { a.x += push; b.x -= push; }
           }
         }
       }
