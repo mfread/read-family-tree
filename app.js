@@ -78,8 +78,8 @@ function initTree() {
   people.forEach(p => { if (!p.spouseIds) p.spouseIds = []; });
 
   let meId = sessionStorage.getItem('meId') || null;
-  let viewMode = 'both'; // both | paternal | maternal
-  let lineageId = null; // person whose lineage is highlighted
+  let viewMode = 'both';
+  let lineageId = null;
 
   const svg = d3.select('#chart');
   const g = svg.append('g');
@@ -94,6 +94,7 @@ function initTree() {
   function isAlive(p) { return !p.dod || !p.dod.trim(); }
 
   const HW = 70, HH = 28;
+  const MIN_SEP = 160; // minimum center-to-center x distance
 
   function computePositions() {
     const pos = {};
@@ -124,9 +125,7 @@ function initTree() {
         }
       });
 
-      // Children of this person (any parent link)
       let children = people.filter(c => (c.parentIds || []).includes(p.id) && !placed.has(c.id));
-      // Sort: half-siblings (only this parent) first so they appear left of full siblings
       children.sort((a, b) => {
         const aHalf = (a.parentIds || []).length === 1;
         const bHalf = (b.parentIds || []).length === 1;
@@ -136,7 +135,7 @@ function initTree() {
       });
 
       if (children.length) {
-        const childY = y + 170;
+        const childY = y + 180;
         const totalWidth = (children.length - 1) * unitX;
         const startX = x - totalWidth / 2;
         children.forEach((child, i) => {
@@ -149,10 +148,33 @@ function initTree() {
     roots.forEach(r => {
       if (!placed.has(r.id)) {
         layout(r, rootX, 0);
-        rootX += unitX * 3.5;
+        rootX += unitX * 4;
       }
     });
     people.forEach(p => { if (!placed.has(p.id)) layout(p, rootX, 0); });
+
+    // Collision resolution: push overlapping nodes apart (same generation / similar y)
+    const ids = Object.keys(pos);
+    for (let iter = 0; iter < 8; iter++) {
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const a = pos[ids[i]], b = pos[ids[j]];
+          if (Math.abs(a.y - b.y) > 40) continue; // different generation
+          const dx = b.x - a.x;
+          const dist = Math.abs(dx);
+          if (dist < MIN_SEP && dist > 0.1) {
+            const push = (MIN_SEP - dist) / 2 + 2;
+            if (dx > 0) {
+              a.x -= push;
+              b.x += push;
+            } else {
+              a.x += push;
+              b.x -= push;
+            }
+          }
+        }
+      }
+    }
 
     return pos;
   }
@@ -168,7 +190,6 @@ function initTree() {
       const p = getPerson(pid);
       if (!p || set.has(pid)) return;
       set.add(pid);
-      // Prefer same-gender parent for direct line
       const parents = (p.parentIds || []).map(getPerson).filter(Boolean);
       const same = parents.find(par => par.gender === wantGender);
       if (same) traceUp(same.id);
@@ -304,7 +325,7 @@ function initTree() {
         e.stopPropagation();
         if (viewMode === 'both') return;
         const want = viewMode === 'paternal' ? 'M' : 'F';
-        if (d.gender !== want) return; // ignore illegal click
+        if (d.gender !== want) return;
         if (lineageId === d.id) lineageId = null;
         else lineageId = d.id;
         render();
@@ -345,7 +366,6 @@ function initTree() {
     }, 40);
   }
 
-  // View mode buttons
   document.querySelectorAll('.view-btn').forEach(btn => {
     btn.onclick = () => {
       document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
@@ -436,7 +456,8 @@ function initTree() {
           if (!person.spouseIds.find(s => s.id === other.id)) person.spouseIds.push({ id: other.id, married });
           if (!other.spouseIds.find(s => s.id === person.id)) other.spouseIds.push({ id: person.id, married });
         }
-        save(); render();
+        save();
+        render();
       } else {
         if (type === 'child') openEditModal(null, 'Add Child', { parentIds: [person.id] });
         else if (type === 'parent') openEditModal(null, 'Add Parent', { asParentOf: person.id });
