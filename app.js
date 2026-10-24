@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import * as f3 from "https://unpkg.com/family-chart@latest";
+import * as f3 from "https://unpkg.com/family-chart@0.9.0/dist/family-chart.esm.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDgvTQ9Zzhnaf_uIQGbtRuRHPuBaVvTWXE",
@@ -118,14 +118,20 @@ function initTree() {
   const data = toF3(people);
   const meId = sessionStorage.getItem('meId') || 'mark';
 
-  const f3Chart = f3.createChart('#chart', data);
-  f3Chart
-    .setCardHtml()
-    .setCardDisplay([["first name", "last name"], ["birthday"]]);
-  f3Chart.editTree()
-    .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname", "gender"])
-    .setEditFirst(false);
-  f3Chart.updateTree({ initial: true });
+  let f3Chart;
+  try {
+    f3Chart = f3.createChart('#chart', data);
+    f3Chart
+      .setCardHtml()
+      .setCardDisplay([["first name", "last name"], ["birthday"]]);
+    f3Chart.editTree()
+      .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname", "gender"])
+      .setEditFirst(false);
+    f3Chart.updateTree({ initial: true });
+  } catch (err) {
+    console.error('family-chart error:', err);
+    document.getElementById('chart').innerHTML = '<p style="color:#f66;padding:20px;">Chart failed to load: ' + err.message + '</p>';
+  }
 
   // Persist changes
   const store = f3Chart.store;
