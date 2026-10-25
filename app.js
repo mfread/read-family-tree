@@ -206,9 +206,7 @@ function initTree() {
     p.gender = document.getElementById('p-gender').value;
     localStorage.setItem('familyTree', JSON.stringify(people));
     panel.style.display = 'none';
-    // Re-render
-    const data = toF3(people);
-    f3Chart.updateTree({ data });
+    location.reload();
   };
 
 
@@ -243,28 +241,7 @@ function initTree() {
     document.getElementById('chart').innerHTML = '<p style="color:#f66;padding:20px;">Chart failed to load: ' + err.message + '</p>';
   }
 
-  // Persist changes - hook both editTree and store
-  let saving = false;
-  function saveNow() {
-    if (saving) return;
-    saving = true;
-    try {
-      const edit = f3Chart.editTree();
-      const exported = edit && edit.exportData ? edit.exportData() : null;
-      if (Array.isArray(exported) && exported.length) {
-        people = fromF3(exported);
-        localStorage.setItem('familyTree', JSON.stringify(people));
-        console.log('saved', people.length);
-        if (edit.closeForm) edit.closeForm();
-        setTimeout(() => f3Chart.updateTree({}), 50);
-      }
-    } catch (e) { console.warn('save skipped', e); }
-    setTimeout(() => { saving = false; }, 200);
-  }
-  const editInst = f3Chart.editTree();
-  if (editInst && editInst.setOnChange) editInst.setOnChange(saveNow);
-  const store = f3Chart.store;
-  if (store && store.setOnUpdate) store.setOnUpdate(saveNow);
+
 
   document.getElementById('theme-toggle').onclick = () => {
     const body = document.body;
