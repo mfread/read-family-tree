@@ -218,13 +218,10 @@ body:has(.f3-form) #js-error {
 }
 
 
-/* hide edit-toggle icon (already in edit mode) */
-.f3-form .f3-edit-toggle,
 .f3-form button[title="Edit"] { display: none !important; }
 
 
 /* hide library form buttons we replace */
-.f3-edit-btn,
 .f3-add-relative-btn,
 .f3-remove-relative-btn { display: none !important; }
 /* modern form look */
