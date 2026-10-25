@@ -165,14 +165,7 @@ function initTree() {
       .setEdit()
       .setCardClickOpen(f3Card);
     f3Chart.updateTree({ initial: true });
-    // Direct click fallback
-    document.getElementById('chart').addEventListener('click', (e) => {
-      const card = e.target.closest('.card');
-      if (!card) return;
-      const edit = f3Chart.editTree();
-      const main = f3Chart.getMainDatum ? f3Chart.getMainDatum() : null;
-      if (edit && main && edit.open) edit.open(main);
-    });
+
     // Set titles on form icons
     const setIconTitles = () => {
       document.querySelectorAll('.f3-form button').forEach(el => {
