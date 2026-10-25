@@ -175,32 +175,8 @@ function initTree() {
         else if (s.includes('close') || el.textContent.trim() === '×') el.title = 'Close';
       });
     };
-    const injectAdd = () => {
-      const form = document.querySelector('.f3-form');
-      if (!form || form.querySelector('.custom-add')) return;
-      const btn = document.createElement('button');
-      btn.className = 'custom-add';
-      btn.textContent = '+ Add person';
-      btn.style.cssText = 'margin:8px;padding:6px 12px;background:#2a6;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;';
-      btn.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const edit = f3Chart.editTree();
-        if (edit && edit.addRelative) {
-          const main = f3Chart.getMainDatum ? f3Chart.getMainDatum() : null;
-          edit.addRelative(main);
-        }
-      };
-      form.prepend(btn);
-    };
-setTimeout(injectAdd, 300);
-    document.addEventListener('click', (e) => {
-      setTimeout(setIconTitles, 200);
-      if (e.target && e.target.matches && e.target.matches('.f3-cancel-btn')) {
-        const edit = f3Chart.editTree();
-        if (edit && edit.closeForm) edit.closeForm();
-      }
-    });
+
+
 
     // Rename Submit -> Save and auto-close form after submit
     const observer = new MutationObserver(() => {
