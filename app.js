@@ -209,14 +209,7 @@ setTimeout(injectAdd, 300);
       });
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    document.addEventListener('click', (e) => {
-      if (e.target && e.target.matches && e.target.matches('.f3-form button[type="submit"]')) {
-        setTimeout(() => {
-          if (edit.closeForm) edit.closeForm();
-          f3Chart.updateTree({});
-        }, 100);
-      }
-    });
+
     status.textContent = 'Chart ready (' + data.length + ')';
     setTimeout(() => status.remove(), 3000);
   } catch (err) {
@@ -235,7 +228,6 @@ setTimeout(injectAdd, 300);
         people = fromF3(exported);
         localStorage.setItem('familyTree', JSON.stringify(people));
         console.log('saved', people.length);
-        f3Chart.updateTree({});
       }
     } catch (e) { console.warn('save skipped', e); }
   }
