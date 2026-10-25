@@ -220,7 +220,10 @@ setTimeout(injectAdd, 300);
   }
 
   // Persist changes - hook both editTree and store
+  let saving = false;
   function saveNow() {
+    if (saving) return;
+    saving = true;
     try {
       const edit = f3Chart.editTree();
       const exported = edit && edit.exportData ? edit.exportData() : null;
@@ -228,8 +231,11 @@ setTimeout(injectAdd, 300);
         people = fromF3(exported);
         localStorage.setItem('familyTree', JSON.stringify(people));
         console.log('saved', people.length);
+        if (edit.closeForm) edit.closeForm();
+        setTimeout(() => f3Chart.updateTree({}), 50);
       }
     } catch (e) { console.warn('save skipped', e); }
+    setTimeout(() => { saving = false; }, 200);
   }
   const editInst = f3Chart.editTree();
   if (editInst && editInst.setOnChange) editInst.setOnChange(saveNow);
