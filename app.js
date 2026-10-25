@@ -159,12 +159,58 @@ function initTree() {
     const f3Card = f3Chart
       .setCardHtml()
       .setCardDisplay([["first name", "last name"], ["birthday"]]);
-    const edit = f3Chart.editTree()
-      .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname"])
-      .setEditFirst(true)
-      .setEdit()
-      .setCardClickOpen(f3Card);
+
     f3Chart.updateTree({ initial: true });
+
+  // Custom edit panel
+  const panel = document.createElement('div');
+  panel.id = 'custom-panel';
+  panel.style.cssText = 'display:none;position:fixed;top:60px;right:10px;width:280px;background:#1e1e1e;color:#fff;padding:16px;border-radius:8px;z-index:1000;font:14px system-ui;';
+  panel.innerHTML = `
+    <h3 style="margin:0 0 12px">Edit person</h3>
+    <label>First name<br><input id="p-first" style="width:100%;margin-bottom:8px;padding:6px;border-radius:4px;border:1px solid #444;background:#2a2a2a;color:#fff"></label>
+    <label>Last name<br><input id="p-last" style="width:100%;margin-bottom:8px;padding:6px;border-radius:4px;border:1px solid #444;background:#2a2a2a;color:#fff"></label>
+    <label>Birthday<br><input id="p-dob" style="width:100%;margin-bottom:8px;padding:6px;border-radius:4px;border:1px solid #444;background:#2a2a2a;color:#fff"></label>
+    <label>Gender<br><select id="p-gender" style="width:100%;margin-bottom:8px;padding:6px;border-radius:4px;border:1px solid #444;background:#2a2a2a;color:#fff"><option value="M">Male</option><option value="F">Female</option></select></label>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button id="p-save" style="flex:1;padding:8px;background:#2a6;color:#fff;border:none;border-radius:4px;cursor:pointer">Save</button>
+      <button id="p-cancel" style="flex:1;padding:8px;background:#444;color:#fff;border:none;border-radius:4px;cursor:pointer">Cancel</button>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  let editingId = null;
+  document.getElementById('chart').addEventListener('click', (e) => {
+    const card = e.target.closest('.card');
+    if (!card) return;
+    const main = f3Chart.getMainDatum ? f3Chart.getMainDatum() : null;
+    if (!main) return;
+    editingId = main.id;
+    const p = people.find(x => x.id === editingId);
+    if (!p) return;
+    const parts = (p.name || '').split(' ');
+    document.getElementById('p-first').value = parts.slice(0, -1).join(' ') || parts[0] || '';
+    document.getElementById('p-last').value = parts.length > 1 ? parts[parts.length - 1] : '';
+    document.getElementById('p-dob').value = p.dob || '';
+    document.getElementById('p-gender').value = p.gender || 'M';
+    panel.style.display = 'block';
+  });
+  document.getElementById('p-cancel').onclick = () => { panel.style.display = 'none'; };
+  document.getElementById('p-save').onclick = () => {
+    const p = people.find(x => x.id === editingId);
+    if (!p) return;
+    const first = document.getElementById('p-first').value.trim();
+    const last = document.getElementById('p-last').value.trim();
+    p.name = [first, last].filter(Boolean).join(' ');
+    p.dob = document.getElementById('p-dob').value.trim();
+    p.gender = document.getElementById('p-gender').value;
+    localStorage.setItem('familyTree', JSON.stringify(people));
+    panel.style.display = 'none';
+    // Re-render
+    const data = toF3(people);
+    f3Chart.updateTree({ data });
+  };
+
 
     // Set titles on form icons
     const setIconTitles = () => {
