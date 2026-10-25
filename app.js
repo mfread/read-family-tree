@@ -160,8 +160,7 @@ function initTree() {
       .setCardDisplay([["first name", "last name"], ["birthday"]]);
 
     f3Chart.updateTree({ initial: true });
-  attachClick();
-
+  
   // Custom edit panel
   const panel = document.createElement('div');
   panel.id = 'custom-panel';
@@ -180,7 +179,8 @@ function initTree() {
   document.body.appendChild(panel);
 
   let editingId = null;
-  function attachClick() { document.getElementById('chart').addEventListener('click', (e) => {
+  document.addEventListener('click', (e) => {
+  if (!e.target.closest('#chart')) return;
     const card = e.target.closest('.card');
     if (!card) return;
     const main = f3Chart.getMainDatum ? f3Chart.getMainDatum() : null;
@@ -194,7 +194,7 @@ function initTree() {
     document.getElementById('p-dob').value = p.dob || '';
     document.getElementById('p-gender').value = p.gender || 'M';
     panel.style.display = 'block';
-  }); }
+});
   document.getElementById('p-cancel').onclick = () => { panel.style.display = 'none'; };
   document.getElementById('p-save').onclick = () => {
     const p = people.find(x => x.id === editingId);
@@ -206,11 +206,20 @@ function initTree() {
     p.gender = document.getElementById('p-gender').value;
     localStorage.setItem('familyTree', JSON.stringify(people));
     panel.style.display = 'none';
-    const data = toF3(people);
-    f3Chart = f3.createChart('#chart', data);
-    f3Chart.setCardHtml().setCardDisplay([["first name", "last name"], ["birthday"]]);
-    f3Chart.updateTree({ initial: true });
-    attachClick();
+    // Update the card text in place
+    const cards = document.querySelectorAll('.card');
+    cards.forEach(c => {
+      const nameEl = c.querySelector('.card_title, .card-title, text');
+      if (nameEl && p) {
+        const lines = p.name.split(' ');
+        if (nameEl.tagName === 'text') {
+          nameEl.textContent = p.name;
+        }
+      }
+    });
+    // Force a visual refresh by toggling a class
+    document.getElementById('chart').style.opacity = '0.99';
+    setTimeout(() => document.getElementById('chart').style.opacity = '1', 10);
   };
 
 
