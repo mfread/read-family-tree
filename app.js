@@ -82,19 +82,7 @@ function initTree() {
   let people = JSON.parse(localStorage.getItem('familyTree') || 'null') || [{ id: 'me', name: 'Me', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'M', parentIds: [], spouseIds: [] }];
   people.forEach(p => { if (!p.spouseIds) p.spouseIds = []; });
 
-  // Fix half-siblings: if Don/Ed only list Charles, attach them to a previous partner
-  if (!people.find(p => p.id === 'charles-prev')) {
-    people.push({ id: 'charles-prev', name: 'Previous partner', dob: '', birthLoc: '', dod: '', deathLoc: '', deathReason: '', gender: 'F', parentIds: [], spouseIds: [{ id: 'charles', married: false }] });
-  }
-  people.forEach(p => {
-    if ((p.id === 'edward' || p.id === 'donald') && (!p.parentIds || p.parentIds.length < 2)) {
-      p.parentIds = ['charles', 'charles-prev'];
-    }
-  });
-  const charles = people.find(p => p.id === 'charles');
-  if (charles && !charles.spouseIds.find(s => s.id === 'charles-prev')) {
-    charles.spouseIds.unshift({ id: 'charles-prev', married: false });
-  }
+
 
 
   function toF3(people) {
