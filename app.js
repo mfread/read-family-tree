@@ -160,6 +160,7 @@ function initTree() {
       .setCardDisplay([["first name", "last name"], ["birthday"]]);
 
     f3Chart.updateTree({ initial: true });
+  attachClick();
 
   // Custom edit panel
   const panel = document.createElement('div');
@@ -179,7 +180,7 @@ function initTree() {
   document.body.appendChild(panel);
 
   let editingId = null;
-  document.getElementById('chart').addEventListener('click', (e) => {
+  function attachClick() { document.getElementById('chart').addEventListener('click', (e) => {
     const card = e.target.closest('.card');
     if (!card) return;
     const main = f3Chart.getMainDatum ? f3Chart.getMainDatum() : null;
@@ -193,7 +194,7 @@ function initTree() {
     document.getElementById('p-dob').value = p.dob || '';
     document.getElementById('p-gender').value = p.gender || 'M';
     panel.style.display = 'block';
-  });
+  }); }
   document.getElementById('p-cancel').onclick = () => { panel.style.display = 'none'; };
   document.getElementById('p-save').onclick = () => {
     const p = people.find(x => x.id === editingId);
@@ -209,6 +210,7 @@ function initTree() {
     f3Chart = f3.createChart('#chart', data);
     f3Chart.setCardHtml().setCardDisplay([["first name", "last name"], ["birthday"]]);
     f3Chart.updateTree({ initial: true });
+    attachClick();
   };
 
 
