@@ -162,6 +162,7 @@ function initTree() {
     const edit = f3Chart.editTree()
       .setFields(["first name", "last name", "birthday", "death date", "death reason", "married surname"])
       .setEditFirst(true)
+      .setEdit()
       .setCardClickOpen(f3Card);
     f3Chart.updateTree({ initial: true });
     // Direct click fallback
