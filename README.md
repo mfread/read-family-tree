@@ -1,3 +1,11 @@
+### Update
+24 Oct 2026
+Started to code this app up using SuperGrok but it failed miserably.
+Switched to ChatGPT (free codex version) and it did a splendid job.
+For now the code lives on my PC. I may upload it into this repo at some point.
+
+-------------------------------------------------
+
 # Read Family Tree
 
 Interactive genealogy visualization webapp (v0.01).
